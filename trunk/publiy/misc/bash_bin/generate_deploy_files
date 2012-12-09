@@ -1,0 +1,84 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	pink "Working directory is missing ($0)";
+	exit -1;
+fi
+workingdir="$1";
+workingdirWin="`cygpath -w $workingdir`";
+workingdirCygwin="`cygpath -u $workingdir`";
+
+if [ ! -f "$workingdir/.labtype" ]; then
+	pink "Missing .labtype file ($0)"; exit -1; fi
+labtype=`cat $workingdir/.labtype`;
+if [ "$labtype" = "CL" ]; then
+   cpuAffinityStr="-DGenerateDeployFileAction.MAX_AFFINITY=3";
+elif [ "$labtype" = "CL_NO_AFF" ]; then
+   cpuAffinityStr="";
+elif [ "$labtype" = "SL" ]; then
+   cpuAffinityStr="-DGenerateDeployFileAction.MAX_AFFINITY=8";
+elif [ "$labtype" = "PL" ]; then
+   cpuAffinityStr="-DGenerateDeployFileAction.MAX_AFFINITY=0";
+elif [ "$labtype" = "ML" ]; then
+   cpuAffinityStr="-DGenerateDeployFileAction.MAX_AFFINITY=2";
+else
+   pink "Unknown labtype $labtype ($0)";
+   exit -1
+fi
+
+export SEPARATOR=';';
+delta=1;
+
+if [ -f "$workingdir/.envvariables" ]; then
+  source "$workingdir/.envvariables"; fi
+yellow "Strategy: $brokerStrategy";
+yellow "Coding: $brokerCoding";
+yellow "MP: $brokerMP";
+yellow "BFT: $brokerBFT";
+yellow "XMX: $brokerXMX";
+yellow "XMS: $brokerXMS";
+pink "DELTA: $delta";
+
+controllerAddress="`get_local_ip $workingdir`";
+auto="$guiAutomation";
+tickscaler="3";
+
+rm -f $workingdirCygwin/deploy*;
+
+outputdir="$workingdir/outputs";
+if [ ! -d "$outputdir" ]; then
+    mkdir -p $outputdir; fi
+
+if [ -r "$workingdir/.fanout" ]; then
+    fanout=`cat $workingdir/.fanout`;
+else
+    fanout="12"; fi
+
+if [ -r "$workingdir/.cand" ]; then
+    cand=`cat $workingdir/.cand`;
+else
+    cand="4"; fi
+
+(
+cd $workingDir;
+java \
+    -cp "$publiyjar$SEPARATOR$publiyguijar$SEPARATOR$layoutjar" \
+    -Dgui.main.MainFrame.bft=$brokerBFT \
+    -Dgui.main.MainFrame.coding=$brokerCoding \
+    -Dgui.main.MainFrame.mp=$brokerMP \
+    -Dgui.main.MainFrame.delta=$delta \
+    -Dgui.FANOUT=$fanout \
+    -Dgui.CAND=$cand -Dgui.tickIntervalScaler=$tickscaler \
+    -Dgui.main.MainFrame.autocontrolleraddress=$controllerAddress \
+    -Dgui.main.MainFrame.autostrategy=$brokerStrategy \
+    -Dgui.main.MainFrame.auto=$auto \
+    -Djava.library.path=$sdynamiclib \
+    -DFailureTimeline.compact=true \
+    -Dgui.main.MainFrame.workingDir=$workingdirWin $cpuAffinityStr \
+    org.msrg.publiy.gui.actions.GenerateDeployFileAction 2&> $outputdir/GENERATE_DEPLOY_OUTPUT 
+) &
+
+wait;
+
+chmod +rwx $workingdirCygwin/deploy*;
+

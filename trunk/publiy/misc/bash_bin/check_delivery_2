@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ -d "$1" ]; then
+    all_gener_files="`ls -d $1/*.gener`"
+else
+    all_gener_files="$*";
+fi
+
+all_deliv_files="`ls -d \`dirname $1\`/*.deliv`";
+deliv_files_counter=0;
+for deliv_file in $all_deliv_files; do
+     deliv_seqs_counter=$((++deliv_files_counter));
+     deliv_sequences_str=$deliv_sequences_str"deliv_file[$deliv_seqs_counter]=\"$deliv_file\";"`awk "BEGIN{i=0}/Seq/{seq=gensub(/.* Seq\[([[:digit:]]*):_([[:digit:]]*)\]/, \"\\\\\\\\1:_\\\\\\\\2\", 1); printf \"deliv_seqs[$deliv_files_counter,\"i++\"]=\\\\\"\"seq\"\\\\\"; \" ;}END{printf \"deliv_seq_count[$deliv_seqs_counter]=\"i\";\"}" $deliv_file`; 
+     green "Finished reading $deliv_file";
+done
+deliv_sequences_str="$deliv_sequences_str; deliv_files_count=$deliv_files_counter;";
+
+for gener_file in $all_gener_files; do
+    yellow "Checking $gener_file";
+    green $all_deliv_files;
+    all_generated_sequences="`awk '/Seq/{seq=gensub(/.* Seq\[([[:digit:]]*):_([[:digit:]]*)\]/, \"\\\\1:_\\\\2\", 1); printf \"gener_seqs[\"i++\"]=\\\"\"seq\"\\\"; \";}END{printf \"gener_seqs_count=\"i\";\"}' $gener_file`"
+
+    awk "BEGIN{$all_generated_sequences $deliv_sequences_str}{for(i=1;i<gener_seqs_count;i++){print \"\"; for(j=1;j<=deliv_files_count;j++){for(k=0;k<deliv_seq_count[j];k++){if(gener_seqs[i]==deliv_seqs[j,k]){ break;}else if(k==deliv_seq_count[j]-1) printf gener_seqs[i]\" not delivered to \"deliv_file[j];}}}}"
+done
+

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "No working directory specified!";
+    exit -1; fi
+workingdir="$1";
+
+for dir in `ls -d $workingdir/*/ 2>/dev/null`; do 
+    yellow $dir;
+    if [ ! -d "$dir" ]; then continue; fi
+    duplicatecount=`detect_delivered_duplicates $dir | awk '{tot+=$NF}END{printf tot}'`;
+    echo $duplicatecount;
+done

@@ -1,0 +1,2 @@
+
+awk '{if(NF>colcount)colcount=NF; for (i=1;i<=NF;i++) tot[i]+=$i}END{for (i=1;i<=colcount;i++)printf tot[i]/NR" ";}' $1;

@@ -1,0 +1,1 @@
+top -b -n 1800 -d 1 -p `ps -al | awk 'BEGIN{ORS="";first=0}/java/{if (first!=0) print ", "; print $1; first++;}END{fflush();}'`

@@ -1,0 +1,122 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    red "Working dir not specified ($0)";
+    exit -1; fi
+workingdir="$1";
+
+data="/home/$ft/System/data";
+bindir="/home/$ft/System/bin/";
+
+rm -rf $data;
+mkdir -p $data;
+cp -r data/* $data;
+
+baseanchor="`get_local_ip $workingdir`";
+anchor="$baseanchor";
+sshprivatekey="/home/Reza/.ssh/pl.id_rsa";
+PL_SETUP="~/localrepo/setup";
+peranchor="2";
+SSH_TIMEOUT="20";
+sjarversion="`get_sjar_version`";
+
+anchor_ready() {
+    if [ "`expr match \"$*\" '[^ ]*'`" -ne 0 ]; then
+    	if [ `expr match "$anchors" '[^ ]*'` -eq 0 ]; then
+    		anchors="$*";
+    	else
+    		anchors="$anchors $*";
+    	fi
+    fi
+}
+
+deploy_using_anchor() {
+    local anchoraddress="$1";
+    local remoteaddress="$2";
+    blue "STARTING $anchoraddress -> $remoteaddress";
+    output=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $ft@$anchoraddress "export ft=$ft; $PL_SETUP/plab_check.sh $anchoraddress $remoteaddress $sjarversion" 2>&1`;
+    if [ $? != 0 ]; then
+    	echo -e "*** $anchoraddress -> $remoteaddress \n $output" > ".out.$remoteaddress";
+    	return -1;
+    else
+    	echo -e "DONE $anchoraddress -> $remoteaddress \n $output" > ".out.$remoteaddress";
+    	return 0;
+    fi
+}
+
+# Now start!
+propcount="`ls $workingdir/backup/*.properties | wc -l`";
+generate_good_nodes "$workingdir" $propcount;
+goodnodesfile="$workingdir/nodes.good";
+nodes=`awk "!/\#/{if(count<$propcount){count++;printf \\\$3\" \"}}" $goodnodesfile`;
+nodesArray=(`echo $nodes | tr ',' ' '`);
+
+allnodesIPs="`ssh reza@master.msrg.utoronto.ca \"source ~/.bash_profile;host_lookup_all ${nodesArray[@]}\"`"; 
+
+# Now deploy
+yellow "STARTING to install all @`date`";
+# red "SKIPPED (Cross your fingers)";
+# exit 0;
+
+for i in `seq 1 $peranchor`; do anchor_ready $anchor; done
+
+for colonseparated in $allnodesIPs; do
+    colonIndex="`expr match "$colonseparated" '[^ :]*:'`";
+    remote="${colonseparated:$colonIndex}";
+    if [ `expr match "$remotes" '[^ ]*'` -eq 0 ]; then
+    	remotes="$remote";
+    else
+    	remotes="$remotes $remote";
+    fi
+done
+
+while [ "`expr match \"$remotes\" '[^ ]*'`" -ne 0 ]; do
+    active_anchors="";
+    active_remotes="";
+
+    while [ "1" = "1" ]; do
+    	beforespaceIndex="`expr match \"$anchors\" '[^ ]*'`";
+    	if [ "$beforespaceIndex" -eq 0 ]; then break; fi;
+    	afterspaceIndex="`expr $beforespaceIndex + 1`";
+    	anchor="${anchors:0:$beforespaceIndex}"; 
+    	anchors="${anchors:$afterspaceIndex}";
+
+    	beforespaceIndex="`expr match \"$remotes\" '[^ ]*'`";
+    	if [ "$beforespaceIndex" -eq 0 ]; then break; fi;
+    	afterspaceIndex="`expr $beforespaceIndex + 1`";
+    	remote="${remotes:0:$beforespaceIndex}"; 
+    	remotes="${remotes:$afterspaceIndex}";
+
+    	if [ `expr match "$active_anchors" '[^ ]*'` -eq 0 ]; then
+    		active_anchors="$anchor";
+    	else
+    		active_anchors="$active_anchors $anchor"; fi
+
+    	if [ `expr match "$active_remotes" '[^ ]*'` -eq 0 ]; then
+    		active_remotes="$remote";
+    	else
+    		active_remotes="$active_remotes $remote"; fi
+
+    	(
+    	    error=0; 
+    	    while :; do
+    	        if [ $error -eq 0 -o 1 -eq 1 ]; then
+                    anchor="$baseanchor"; fi
+    	        deploy_using_anchor $anchor $remote;
+    	        if [ $? -ne 0 ]; then
+    	            error=1; red "ERROR $anchor -> $remote";
+    	        else green "DONE $anchor -> $remote"; break;
+    	        fi; 
+    	    done
+    	)&
+    done;
+
+    wait ;
+
+    for i in `seq 1 $peranchor`; do
+        anchor_ready $active_remotes; done
+    anchor_ready $active_anchors;
+done
+
+wait;
+

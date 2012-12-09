@@ -1,0 +1,56 @@
+#!/bin/bash
+
+MAX_CONCUR_TEST="10";
+counter="0";
+nodes=`awk 'BEGIN{first=1} !/^#/ {if(first==1) printf $2; else printf " "$2; first=0;}' $1`;
+
+for node in $nodes; do
+	(
+            test_result="`test_node $node 2>/dev/null`";
+            echo $test_result;
+	) 2>/dev/null &
+	p=$!;
+	ssh_pids="$p $ssh_pids";
+done
+
+sleep 60;
+kill -9 $ssh_pids 2>/dev/null;
+exit 0;
+
+
+logname="`dirname $1`/nodes.test";
+echo "@`date`" > $logname;
+for node in $nodes; do 
+    if [ $counter -gt $MAX_CONCUR_TEST ]; then
+        for i in `seq 1 4`; do
+            sleep 5;
+            remaining="";
+            for p in $ssh_pids; do
+                if [ "`ps -s -p $p | grep bash | wc -l`" -gt 0 ]; then
+                    remaining="$p.$remaining";
+                fi;
+            done
+            if [ -z "$remaining" ]; then break; fi
+        done
+        
+        # Now clear and kill remining
+        for ssh_pid in $ssh_pids; do
+            kill -9 $ssh_pid 2>/dev/null; done
+        ssh_pids="";
+        counter="0";
+
+    else
+        counter=`expr $counter + 1`;
+        (
+            test_result="`test_node $node 2>/dev/null`";
+            echo $test_result;
+            echo $test_result >> $logname;
+            sleep 1;
+        )2>/dev/null &
+        p="$!";
+        ssh_pids="$ssh_pids $p";
+    fi
+done
+
+wait;
+

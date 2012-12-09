@@ -1,0 +1,7 @@
+#!/bin/gawk -f
+
+BEGIN{ FS="count=";initialized=0;errCount=0; first=-1;} 
+
+/\*\*\*/ {seq=$2+1-1; if (first==-1) first=seq; if(initialized && nextSeq!=seq) {print $0,"\tERROR-Expected: ",nextSeq;errCount=errCount+1} nextSeq=seq+step; initialized=1 }
+
+END {print "\nThere were",errCount, " errors."; print "First Message was: ",first; print "Last Message was: ",seq}

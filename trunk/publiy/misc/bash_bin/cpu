@@ -1,0 +1,6 @@
+#!/bin/bash
+
+
+monitor | awk 'BEGIN{RS="\n"; ORS="";i=0} /top - /{time=$3; print ++i"\t"time"\t"; for (arin in vals) print arin," ",vals[arin]"\t"; print "\n"; delete vals;} /java/{pid=$1; vals[pid]=$9;}'
+
+

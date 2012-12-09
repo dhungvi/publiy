@@ -1,0 +1,108 @@
+#!/bin/bash
+
+
+if [ ! -d "$dir1" ]; then
+   red "Dir1 $dir1 is not set";
+   exit -1; fi
+
+if [ ! -d "$dir2" ]; then
+   red "Dir2 $dir2 is not set";
+   exit -1; fi
+
+if [ ! -d "$dir3" ]; then
+   red "Dir3 $dir3 is not set";
+   exit -1; fi
+
+workingdir=`pwd`;
+
+exec1="`echo $dir1 | awk '{printf gensub(/.*__([[:digit:]]*).*/,"\\\\1",1);}'`"
+exec2="`echo $dir2 | awk '{printf gensub(/.*__([[:digit:]]*).*/,"\\\\1",1);}'`"
+exec3="`echo $dir3 | awk '{printf gensub(/.*__([[:digit:]]*).*/,"\\\\1",1);}'`"
+
+fanout1="`echo $dir1 | awk '{printf gensub(/.*FOUT([[:digit:]]*).*/,"\\\\1",1);}'`"
+fanout2="`echo $dir2 | awk '{printf gensub(/.*FOUT([[:digit:]]*).*/,"\\\\1",1);}'`"
+fanout3="`echo $dir3 | awk '{printf gensub(/.*FOUT([[:digit:]]*).*/,"\\\\1",1);}'`"
+if [ "$fanout1" != "$fanout2" -o "$fanout2" != "$fanout3" ]; then
+     red "Fanout values mismatch: $fanout1, $fanout2, $fanout3";
+     exit -1; fi
+
+mult1="`echo $dir1 | awk '{printf gensub(/.*MULT([[:digit:]]*).*/,"\\\\1",1);}'`"
+mult2="`echo $dir2 | awk '{printf gensub(/.*MULT([[:digit:]]*).*/,"\\\\1",1);}'`"
+mult3="`echo $dir3 | awk '{printf gensub(/.*MULT([[:digit:]]*).*/,"\\\\1",1);}'`"
+if [ "$delta1" != "$delta2" -o "$delta2" != "$delta3" ]; then
+     red "Delta values mismatch: $delta1, $delta2, $delta3";
+     exit -1; fi
+
+inbw1="`echo $dir1 | awk '{printf gensub(/.*BW_METRIC_[^{]*{([[:digit:]]*)-([[:digit:]]*)}.*/,"\\\\1",1);}'`"
+inbw2="`echo $dir2 | awk '{printf gensub(/.*BW_METRIC_[^{]*{([[:digit:]]*)-([[:digit:]]*)}.*/,"\\\\1",1);}'`"
+inbw3="`echo $dir3 | awk '{printf gensub(/.*BW_METRIC_[^{]*{([[:digit:]]*)-([[:digit:]]*)}.*/,"\\\\1",1);}'`"
+if [ "$inbw1" != "$inbw2" -o "$inbw2" != "$inbw3" ]; then
+     red "Inbw values mismatch: $inbw1, $inbw2, $inbw3";
+     exit -1; fi
+
+outbw1="`echo $dir1 | awk '{printf gensub(/.*BW_METRIC_[^{]*{([[:digit:]]*)-([[:digit:]]*)}.*/,"\\\\2",1);}'`"
+outbw2="`echo $dir2 | awk '{printf gensub(/.*BW_METRIC_[^{]*{([[:digit:]]*)-([[:digit:]]*)}.*/,"\\\\2",1);}'`"
+outbw3="`echo $dir3 | awk '{printf gensub(/.*BW_METRIC_[^{]*{([[:digit:]]*)-([[:digit:]]*)}.*/,"\\\\2",1);}'`"
+if [ "$outbw1" != "$outbw2" -o "$outbw2" != "$outbw3" ]; then
+     red "Outbw values mismatch: $outbw1, $outbw2, $outbw3";
+     exit -1; fi
+
+delta1="`echo $dir1 | awk '{printf gensub(/.*-d([[:digit:]]*)-.*/,"\\\\1",1);}'`"
+delta2="`echo $dir2 | awk '{printf gensub(/.*-d([[:digit:]]*)-.*/,"\\\\1",1);}'`"
+delta3="`echo $dir3 | awk '{printf gensub(/.*-d([[:digit:]]*)-.*/,"\\\\1",1);}'`"
+if [ "$delta1" != "$delta2" -o "$delta2" != "$delta3" ]; then
+     red "Delta values mismatch: $delta1, $delta2, $delta3";
+     exit -1; fi
+
+str1="`echo $dir1 | awk '{printf gensub(/.*STR([[:digit:]]*).*/,"\\\\1",1);}'`"
+str2="`echo $dir2 | awk '{printf gensub(/.*STR([[:digit:]]*).*/,"\\\\1",1);}'`"
+str3="`echo $dir3 | awk '{printf gensub(/.*STR([[:digit:]]*).*/,"\\\\1",1);}'`"
+
+if [ "$str1" != "1" ]; then
+    red "$dir1 is not a strategy 1 directory";
+    exit -1;
+elif [ "$str2" != "2" ]; then
+    red "$dir2 is not a strategy 2 directory";
+    exit -1;
+elif [ "$str3" != "3" ]; then
+    red "$dir3 is not a strategy 3 directory";
+    exit -1;
+fi
+
+pdelay1="`echo $dir1 | awk '{printf gensub(/.*DELAY{([[:digit:]]*)-([[:digit:]]*)}.*/,"\\\\1",1);}'`"
+pdelay2="`echo $dir2 | awk '{printf gensub(/.*DELAY{([[:digit:]]*)-([[:digit:]]*)}.*/,"\\\\1",1);}'`"
+pdelay3="`echo $dir3 | awk '{printf gensub(/.*DELAY{([[:digit:]]*)-([[:digit:]]*)}.*/,"\\\\1",1);}'`"
+
+p2p_all=`awk '{printf $1" "}' $dir1/plots/delivery_pathlength_timings_grouped`;
+
+summaryfilename="strategies_delivery_pathlength_timing_summary_mult"$mult1","$mult2","$mult3"_pdelay"$pdelay1","$pdelay2","$pdelay3"_delta"$delta1,$delta2,$delta3"_str"$str1","$str2","$str3"_fanout"$fanout1","$fanout2","$fanout3"_bw"$inbw1"_exec"$exec1","$exec2","$exec3; 
+
+i=0;
+if [ -f "$summaryfilename" ]; then
+     red "SKIPPING creation of summary file $summaryfilename";
+else
+    for p2p in $p2p_all ; do
+        ((++i));
+        if [ `expr match "$p2p" ".*,.*"` -ne 0 ]; then
+            p2p=${p2p:0:`expr match "$p2p" "[^,]*"`}"_"${p2p:`expr match "$p2p" "[^,]*,"`}"[[:blank:]]";
+        else
+            p2p="$p2p[[:blank:]]";
+        fi
+        str1=`grep "$p2p" $dir1/plots/delivery_pathlength_timings_summary`;
+        str2=`grep "$p2p" $dir2/plots/delivery_pathlength_timings_summary`;
+        str3=`grep "$p2p" $dir3/plots/delivery_pathlength_timings_summary`;
+        echo -e "$i\t1\t$str1";
+        echo -e "$i\t2\t$str2";
+        echo -e "$i\t3\t$str3";
+        echo "";
+    done > $summaryfilename;
+fi
+
+for str in 1 2 3; do 
+    strXsummaryfile="strategies_delivery_pathlength_timing_summary_mult"$mult1","$mult2","$mult3"_pdelay"$pdelay1","$pdelay2","$pdelay3"_delta"$delta1,$delta2,$delta3"_str"$str"_fanout"$fanout1","$fanout2","$fanout3"_bw"$inbw1"_exec"$exec1","$exec2","$exec3;
+    awk "{if(\$2==$str)print}" $summaryfilename > $strXsummaryfile;
+    green -e "Strategy $str\n`awk '{tot_delay+=$4; tot_path_len+=$5; tot_msg+=$6;}END{print "Total msg:\\t"tot_msg"\\nTotal pathlen:\\t"tot_path_len"\\nTotal delay:\t"tot_delay"\\nAvg Pathlen:\\t"(tot_path_len/tot_msg)"\\nAvg delay:\\t"(tot_delay/tot_msg); }' $strXsummaryfile`";
+done
+
+
+

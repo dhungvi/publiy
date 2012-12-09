@@ -1,0 +1,15 @@
+package org.msrg.publiy.broker.core.connectionManager.connectionStateMachine;
+
+public enum SessionEventType {
+	
+	SESSION_E_INCOMING,
+	SESSION_E_MAKE_OUTCOMING,
+	SESSION_E_CONNECTED,
+	SESSION_E_DISCONNECTED,
+	SESSION_E_REGISTERED,
+	SESSION_E_JOINING,
+	
+	SESSION_E_MAKE_SOFT,
+	SESSION_E_MAKE_CANDIDATE,
+	SESSION_E_DECANDIDATE,
+}

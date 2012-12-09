@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    red "No working directory specified";
+    exit -1; fi
+workingdir="$1";
+
+for subBC in `ls -d $workingdir/BC-s*`; do
+    blue -n "Checking `basename $subBC`: ";
+    tmp_delivered_seq $subBC | awk '{if(seq[$2,$3]){print "DUPLICATE:"$0" ";} seq[$2,$3]=1;}' | awk 'BEGIN{dupcounter=0}{dupcounter++} END{if (dupcounter>=0)print "Duplicate count: "dupcounter}';
+done # | gawk '/^DT/{print ""; print "\n"$0;}/Duplicate count/{printf gensub(/Duplicate count: ([[:digit:]]*).*/, "\\1 ", 1);}'
+

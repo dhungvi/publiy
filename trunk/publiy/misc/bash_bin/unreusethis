@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+        workingdir=`pwd`;
+else
+        workingdir="$1"; fi
+
+echo "" > "$workingdir/.reuse";

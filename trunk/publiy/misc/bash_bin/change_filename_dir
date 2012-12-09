@@ -1,0 +1,54 @@
+sed -i -e "s/^Filename=.*/Filename=$1/" $2
+
+exit 0;
+
+datafiledir="$1";
+inputdir="$2";
+outputdir="$3";
+
+if [ -z "$datafiledir" ]; then
+	echo "Datafile directory is not specified";
+	exit -1;
+fi;
+
+if [ ! -d "$inputdir" ]; then
+	echo "Input directory is not valid.";
+	exit -1;
+fi;
+
+if [ ! -d "$outputdir" ]; then
+	echo "Output directory is not valid.";
+	exit -1;
+fi;
+
+#args=("$@");
+#lastargindex="`expr ${#args[@]} - 1`";
+#counter="0";
+#for argindex in `seq 1 $lastargindex`; do 
+#	echo "Processing $filename";
+#	filename="${args[$argindex]}";
+#	basename="`basename $filename`";
+#	awk "{print gensub(/(Filename=)(.*)\/([[:alnum:]_\.-]*)$/, \"\\\\1$1\",1)}" $filename > $outputdir/$basename;
+#	counter="`expr $counter + 1`";
+#done
+
+counter="0";
+for pPath in `ls -d $inputdir/p*.properties`; do
+	pFilename="`basename $pPath`";
+	opPath="$outputdir/$pFilename";
+
+	echo "Processing $pPath -> $opPath";
+	awk "{print gensub(/(.*Filename=)(.*)/, \"\\\\1$datafiledir/PubFile_$counter.pub\", 1)}" $pPath > $opPath;
+	counter="`expr $counter + 1`";
+done
+
+counter="0";
+for sPath in `ls -d $inputdir/s*.properties`; do
+	sFilename="`basename $sPath`";
+	osPath="$outputdir/$sFilename";
+
+	echo "Processing $sPath -> $osPath";
+	awk "{print gensub(/(.*Filename=)(.*)/, \"\\\\1$datafiledir/SubFile_$counter.sub\", 1)}" $sPath > $osPath;
+	counter="`expr $counter + 1`";
+done
+

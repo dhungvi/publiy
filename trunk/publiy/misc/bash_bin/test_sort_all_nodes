@@ -1,0 +1,11 @@
+#!/bin/bash
+
+
+test_all_nodes $1 | 
+ awk 'BEGIN{srand();}{delays[int(($1+rand())*1000)]=$0;} END{n=asort (delays); for (i=1; i<=n; i++) print i, delays[i];}' |
+# awk '{print $1"\t"$3"\t\t\t"$2}';
+ awk '{print $0}';
+
+
+wait;
+

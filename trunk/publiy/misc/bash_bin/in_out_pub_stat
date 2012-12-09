@@ -1,0 +1,1 @@
+for file in `ls $1/*.traffic`; do echo -en "`basename $file`: "; sumup_cols $file | awk '{print $8, $9, $10, $11}';done

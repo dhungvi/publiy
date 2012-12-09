@@ -1,0 +1,29 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "No working dir specified"
+    exit -1; fi
+workingdir="$1";
+basedir=`dirname $workingdir`;
+
+
+org_name=`basename $workingdir`
+org_pdelay=`echo $org_name | awk '{printf gensub(/.*DELAY{([[:digit:]]*)-([[:digit:]]*).*/, "\\\\1", 1)}'`
+org_before_pdelay=`echo $org_name | awk '{printf gensub(/(.*DELAY{)([[:digit:]]*)(-[[:digit:]]*.*)/, "\\\\1", 1)}'`
+org_after_pdelay=`echo $org_name | awk '{printf gensub(/(.*DELAY{)([[:digit:]]*)(-[[:digit:]]*.*)/, "\\\\3", 1)}'`
+
+
+supposed_pdelay=`awk '/Delay=/{printf gensub(/Delay=([[:digit:]]*)/, "\\\\1", 1); exit 0}' $workingdir/p*.properties`;
+
+if [ "$org_pdelay" != "$supposed_pdelay" ]; then
+     new_name="${org_before_pdelay}${supposed_pdelay}${org_after_pdelay}"
+     if [ -d "$new_name" ]; then
+         red "**** Another directory with similar name exists (DOING NOTHING)."
+         red "$org_name"
+     else
+         yellow "$org_name"
+         mv $basedir/$org_name $basedir/$new_name
+     fi
+else
+     green "$org_name"
+fi

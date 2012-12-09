@@ -1,0 +1,18 @@
+
+if [ $# = 1 ];
+then
+	workingdir=$(pwd)/;
+else
+	workingdir=$(pwd)/$1;	
+fi;
+echo "Working dir: " $workingdir
+
+orgdir=$(pwd);
+
+pdeploytar=/tmp/pdeploy.tar.gz ;
+rm -f $pdeploytar ; 
+cd $workingdir
+tar -zcf $pdeploytar pdeploy*;
+cd $orgdir
+scp $pdeploytar sherafr@moore.cas.mcmaster.ca:public_html/planetlab/setup/pdeploy.tar.gz
+

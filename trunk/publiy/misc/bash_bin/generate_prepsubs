@@ -1,0 +1,23 @@
+#!/bin/bash
+
+GENERATE_LOCAL_SUBS=false;
+MIN_MEM=50;
+MAX_MEM=50;
+#MAX_MEM=6000;
+
+if [ ! -d "$1" ]; then
+   red "No working dir $*"; exit -1; fi
+workingdir=`cygpath -m $1`;
+if [ `expr match "$OSTYPE" ".*linux.*"` -ne 0 ]; then SEPARATOR=':'; else SEPARATOR=';'; fi
+
+green  "java -cp \"$gjar$SEPARATOR$sjar$SEPARATOR$ncjar\"";
+
+for delta in 0 2 4; do 
+  blue "DELTA=$delta";
+  java -cp "$gjar$SEPARATOR$sjar$SEPARATOR$ncjar" \
+       -DGENERATE_LOCAL_SUBS=$GENERATE_LOCAL_SUBS \
+       -Xmx${MAX_MEM}m -Xms${MIN_MEM}m \
+       -Dgui.main.MainFrame.workingDir=$workingdir \
+       -Dgui.main.MainFrame.delta=$delta \
+       utils.generator.covering.GOverlayManagerWithSubscriptions; 
+done

@@ -1,0 +1,1 @@
+awk 'BEGIN{FS="\\\\|:|/|="} /NodeAddress/{printf $2"_"$4" "}' *.properties

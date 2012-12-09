@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Working dir $1 is not accessible";
+    exit -1; fi
+workingdir="$1";
+
+echo "#MULT, PDELAY, SDELAY, TICK, STRATEGY, PUBSCOUNT, DELIVERIESCOUNT, DUPLICATESCOUNT, EXECNO, DIRNAME" > $workingdir/`basename $workingdir`_table.csv;
+
+summaries2file="$workingdir/.summaries2";
+if [ ! -r "$summaries2file" ]; then
+    yellow "RE-MAKING summaries2 first for $workingdir";
+    make_summaries2 $workingdir;
+fi
+
+tablefile="$workingdir/`basename $workingdir`_table.csv";
+
+awk '{
+    print gensub(/.*MULT([[:digit:]\.]*).*DELAY{([[:digit:]]*)-([[:digit:]]*)}.*TICK([[:digit:]]*).*STR([[:digit:]]*).*__([[:digit:]]*).*Pub\(([[:digit:]]*).*Deliv\(([[:digit:]]*)\).*Dup\(([[:digit:]]*)\)/,"\\1,\t\\2,\t\\3,\t\\4,\t\\5,\t\\7,\t\\8,\t\\9,\t\\6",1)",\t"$1}' $summaries2file >> $tablefile;
+

@@ -1,0 +1,136 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then 
+    red "Working directory is missing ($0)";
+    exit -1;
+fi;
+workingdir="$1";
+if [ -z "$2" ]; then
+    red "No command given!";
+    exit -2; fi;
+command="$2";
+
+localrepo="/home/Reza/localrepo";
+sshprivatekey="$localrepo/../.ssh/id_rsa";
+sshpubkey="$localrepo/../.ssh/id_rsa.pub";
+
+CL_USER="reza";
+CL_HOME="/home/master/$CL_USER";
+CL_SDIR="$CL_HOME/System";
+CL_OUTPUT_BCS="\\\`get_outputs_dir\\\`/BC-*";
+CL_OUTPUT_BCS="\\\$OUTPUTS_DIR/BC-*";
+CL_ALL_TAR_DIR="$CL_HOME";
+CL_ALL_TAR="all.tar.gz";
+CL_MASTER="10.0.0.1";
+
+if [ "$command" = "TARALL" ] ; then
+    if [ -z "$3" ]; then
+       red "No destination dir specified!";
+       exit -1;
+    elif [ ! -d "$3" ]; then
+        mkdir -p $3 2>/dev/null;
+    fi;
+
+    clab_all $workingdir COUNTALL >> $workingdir/.countall;
+    echo "COUNTALL: "`grep "==>" $workingdir/.countall` | green
+    clab_all $workingdir CHECK_SUBS >> $workingdir/.checksubs;
+    clab_all $workingdir TAR $3;
+    exit 0;
+elif [ "$command" = "CHECK_SUBS" ]; then
+   for prop in `ls $workingdir/*.properties`; do
+       node=`awk 'BEGIN{FS="="} /NodeName/{printf \$NF}' $prop`;
+       address=`awk 'BEGIN{FS="\\\\\\\:|="}/NodeAddress/{printf \$(NF-1)}' $prop`;
+       port=`awk 'BEGIN{FS="\\\\\\\:|="}/NodeAddress/{printf \$(NF)}' $prop`;
+       (
+          # blue "$node @ $address"`ssh -i $sshprivatekey $CL_USER@$address "echo -en \"\\\$OUTPUTS_DIR/BC-$node-*: \";grep -ai 'Adding new Subscription' \\\$OUTPUTS_DIR/BC-$node-* | wc -l"`; 
+          blue -e "$node\t${address}_${port}\t"`ssh -i $sshprivatekey $CL_USER@$address "awk '{if(maxSubCount<\\\$2){maxSubCount=0+\\\$2; maxSubCountTime=\\\$1} }END{print maxSubCount,\"@\",maxSubCountTime}' \\\$OUTPUTS_DIR/${address}_${port}.stats"`; 
+          
+       )&
+       pids="$! $pids";
+   done
+   trap 'kill -9 $pids' 2;
+   wait ;
+   exit;
+fi
+
+if [ "$command" = "COUNTALL" ]; then
+    clab_all $workingdir "COUNT" | awk '{totp+=$2; totd+=$3; print $0} END{print "==> "totp, totd}';
+    exit 0;
+elif [ "$command" = "QCHECK" ]; then
+    if [ ! -z "$3" ]; then
+      datadir="$3";
+    else
+      red "No data dir specifed ($0)";
+      exit -1;
+    fi
+    clab_q_check $CL_MASTER $datadir;
+    exit 0;
+elif [ "$command" = "GREP" ]; then
+    if [ -z "$3" ]; then
+        red "Missing string to grep for!";
+        exit -1; fi
+    shift; shift;
+    # echo "ssh -i $sshprivatekey $CL_USER@$CL_MASTER \"source ~/.bash_profile; grep $* \\\$OUTPUTS_DIR/BC-*\"";
+    ssh -i $sshprivatekey $CL_USER@$CL_MASTER "grep -a $* \$OUTPUTS_DIR/BC-*";
+    exit 0;
+# elif [ "$command" = "COUNTALL" ]; then
+#    echo `ssh -i $sshprivatekey $CL_USER@$CL_MASTER "source $CL_HOME/.bash_profile; count_all $CL_OUTPUT"`;
+#    exit 0;
+fi;
+
+for depscript in `ls -d $workingdir/deploy-*.sh`; do
+    remote="`awk '/Deploy entry /{print $NF; exit 0;}' $depscript`";
+    if [ "$command" = "GREPALL" ]; then
+        (
+            shift; shift;
+            clab_all $workingdir GREP $*
+        ) &
+    elif [ "$command" = "SYNC" ]; then
+        (
+            blue "Sync on $remote `ssh -i $sshprivatekey $CL_USER@$remote \"sync; echo OK!\"`";
+        ) &
+    elif [ "$command" = "SEEEX" ]; then
+        shift;
+        if [ "$1" = "SHOW" ]; then
+            show="SHOW"; fi
+        clab_seeex $remote $show &
+    elif [ "$command" = "COUNT" ]; then
+        blue -e `ssh -i $sshprivatekey $CL_USER@$remote "if [ \\\`ls \\\\\\\$OUTPUTS_DIR/*.gener 2>/dev/null | wc -l\\\` -ne 0 ]; then echo -en \"$remote: \\\`wc -l \\\$OUTPUTS_DIR/*.gener | awk 'END{print \\\$1}' \\\`, \\\`wc -l \\\$OUTPUTS_DIR/*.deliv | awk 'END{print \\\$1}'\\\`\"; else echo -en \"$remote: \\\`grep -a Publishing \\\$OUTPUTS_DIR/BC-*\\\$HOSTNAME* | wc -l\\\`, \\\`grep -a DELIV \\\$OUTPUTS_DIR/BC-*\\\$HOSTNAME* | wc -l;\\\`\"; fi"` &
+
+    elif [ "$command" = "KILL" ]; then
+        clab_kill $remote &
+    elif [ "$command" = "CLEAN" ]; then
+        clab_clean $remote &    
+    elif [ "$command" = "DEPLOY" ]; then
+        clab_deploy $remote $workingdir &
+    elif [ "$command" = "TAR" ]; then
+        if [ -z "$3" ]; then
+            red "No destination dir specified!";
+            exit -1;
+        elif [ ! -d "$3" ]; then
+            mkdir -p $3 2>/dev/null;
+        fi;
+        (clab_tar $remote $3)&
+    elif [ "$command" = "EXEC" ]; then
+        if [ -z "$3" ]; then
+            red "Missing script to execute";
+            exit -1; fi
+        script="$3";
+        (output=`ssh -i $sshprivatekey $CL_USER@$remote "$3"`;
+        blue $output;)&
+     else
+        red "Unknown command: $command.";
+        exit -1;
+    fi
+done
+
+wait;
+
+if [ "$command" = "TARALL" -a "1" = "0" ]; then
+    initialdir="`pwd`";
+    cd $3;
+    for tg in `ls *$CL_ALL_TAR`;do blue $tg;tar -zxf $tg;done
+    cd $initialdir;
+elif [ "$command" = "KILL" ]; then
+    sleep 20;
+fi

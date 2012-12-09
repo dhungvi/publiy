@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    red "No col count specified";
+    exit -1; fi
+COL_COUNT="$1";
+shift;
+
+pink -en "Cleaning"; 
+for traffic in $*; do
+    pink -en " `basename $traffic`";
+    awk '{if(NF==35)print;}' $traffic > $traffic.clean$COL_COUNT;
+done
+pink "";

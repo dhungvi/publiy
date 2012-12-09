@@ -1,0 +1,2 @@
+awk '/TMP Received/{print gensub(/.*Seq\[([[:digit:]]*):_([[:digit:]]*)\]{.*/, "Seq \\1 \\2", 1);}' $1
+#awk '/TMP Received/{print gensub(/.*Seq\[([[:digit:]]*):_([[:digit:]]*)\]{.*/, "Seq \\1 \\2", 1);}'

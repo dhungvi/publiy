@@ -1,0 +1,189 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then 
+    red "Working dir is missing ($0)";
+    exit -1; fi
+workingdir=$1;
+
+if [ -z "$2" ]; then
+    red "No command given!";
+    exit -2; fi;
+command=$2;
+
+sshprivatekey="$HOME/.ssh/pl.id_rsa";  
+timestamp="`date +%s`";
+probesdir="$workingdir/probes";
+if [ ! -d "$probesdir" ]; then mkdir -p $probesdir; fi
+
+PL_USER="$ft";
+PL_HOME="/home/utoronto_jacobsen_ft";
+PL_TOP_PROBE="$PL_HOME/top.out";
+PL_JAVA_TAR="$PL_HOME/localrepo/java32.tar.gz";
+PL_SYSDIR="$PL_HOME/System"
+PL_OUTPUT="$PL_HOME/System/outputs";
+PL_OUTPUT_BCS="$PL_OUTPUT/BC-*";
+PL_ALL_TAR_DIR="$PL_HOME";
+PL_ALL_TAR="all.tar.gz";
+
+function probe_this () {
+    return;
+    local remoteaddress=$1;
+    ssh -i $sshprivatekey $PL_USER@$remoteaddress "top -b -n 1 > $PL_TOP_PROBE-$remoteaddress-$timestamp;";
+    scp -i $sshprivatekey $PL_USER@$remoteaddress:$PL_TOP_PROBE-$remoteaddress-$timestamp $probesdir;
+}
+
+if [ "$command" = "TARALL" ] ; then
+    if [ -z "$3" ]; then
+       red "No destination dir specified!";
+       exit -1;
+    elif [ ! -d "$3" ]; then
+        mkdir -p $3 2>/dev/null;
+    fi;
+
+    plab_all $workingdir COUNTALL >> $workingdir/.countall;
+    plab_all $workingdir CHECK_SUBS >> $workingdir/.checksubs;
+    plab_all $workingdir TAR $3;
+    exit 0;
+elif [ "$command" = "CHECK_SUBS" ]; then
+   for prop in `ls $workingdir/*.properties`; do
+       node=`awk 'BEGIN{FS="="} /NodeName/{printf \$NF}' $prop`;
+       address=`awk 'BEGIN{FS="\\\\\\\:|="}/NodeAddress/{printf \$(NF-1)}' $prop`;
+       port=`awk 'BEGIN{FS="\\\\\\\:|="}/NodeAddress/{printf \$(NF)}' $prop`;
+       (
+          # blue "$node @ $address"`ssh -i $sshprivatekey $PL_USER@$address "echo -en \"\\\$OUTPUTS_DIR/BC-$node-*: \";grep -ai 'Adding new Subscription' \\\$OUTPUTS_DIR/BC-$node-* | wc -l"`; 
+          blue -e "$node\t${address}_${port}\t"`ssh -i $sshprivatekey $PL_USER@$address "awk '{if(maxSubCount<\\\$2){maxSubCount=0+\\\$2; maxSubCountTime=\\\$1} }END{print maxSubCount,\"@\",maxSubCountTime}' \\\$OUTPUTS_DIR/${address}_${port}.stats"`; 
+          
+       )&
+       pids="$! $pids";
+   done
+   trap 'kill -9 $pids' 2;
+   wait ;
+   exit;
+fi
+
+if [ "$command" = "COUNTALL" ]; then
+    plab_all $workingdir "COUNT" | awk '{totp+=$2; totd+=$3; print $0} END{print "==> "totp, totd}';
+    # plab_all $workingdir "COUNT" | awk '{totp+=$(NF-1); totd+=$NF; print $0} END{print "==> "totp, totd}';
+    exit 0;
+fi
+
+for depscript in `ls -d $workingdir/deploy-*.sh`; do
+    remote=`awk '/Deploy entry /{print $NF; exit 0;}' $depscript`;
+    if [ "$command" = "PRINT_SJAR" ]; then
+        green `ssh -i $sshprivatekey $PL_USER@$remote "source ~/.bash_profile; echo \$remote: \\\`java sutils.SystemPackageVersion\\\`"`;
+    elif [ "$command" = "PRINT" ]; then
+        echo $remote;
+    elif [ "$command" = "INSTALLJAVA" ]; then
+        javatarsize=`ssh -i $sshprivatekey $PL_USER@$remote "if [ -f $PL_JAVA_TAR ]; then echo \"$remote: \`ls -s $PL_JAVA_TAR\`\"; else echo \"0\"; mkdir -p \`dirname $PL_JAVA_TAR\`; fi"`;
+        blue "$javatarsize";
+    elif [ "$command" = "PROBE" ]; then
+        (
+            probe_this $remote;
+        ) &
+    elif [ "$command" = "SEEEX" ]; then
+        shift;
+        plab_seeex $remote $* &
+    elif [ "$command" = "COUNT" ]; then
+        blue -e `ssh -i $sshprivatekey $PL_USER@$remote "echo -en \"$remote: 0\\\`wc -l \\\$OUTPUTS_DIR/*.gener 2>/dev/null | awk 'END{print \\\$1}' \\\`, 0\\\`wc -l \\\$OUTPUTS_DIR/*.deliv 2>/dev/null | awk 'END{print \\\$1}'\\\`\";"` &
+        #(
+        #  stime=`date +%s`;
+        #  result=`ssh -i $sshprivatekey $PL_USER@$remote "echo -en \\\`grep -a Publishing $PL_OUTPUT_BCS | wc -l\\\`, \\\`grep -a DELIV $PL_OUTPUT_BCS | wc -l;\\\`";`"\n";
+        #  etime=`date +%s`;
+        #  blue -en "`expr $etime - $stime`\t$remote\t $result";
+        #) &
+    elif [ "$command" = "QCHECK" ]; then
+      if [ ! -z "$3" ]; then
+        datadir="$3";
+      elif [ -f ".usingdataset" ]; then
+        datadir="`cat .usingdataseti`";
+      else
+        red "No data dir specifed ($0)";
+        exit -1;
+      fi
+      plab_q_check $remote $datadir &
+    elif [ "$command" = "KILL" ]; then
+        (
+            plab_kill $remote;
+            probe_this $remote;
+        ) &
+    elif [ "$command" = "CLEAN" ]; then
+        plab_clean $remote &    
+    elif [ "$command" = "DEPLOY" ]; then
+        (
+            plab_deploy $remote `pwd`;
+            probe_this $remote;
+        ) &
+    elif [ "$command" = "TARALL" ]; then
+        if [ -z "$3" ]; then
+            red "No destination dir specified!";
+            exit -1;
+        elif [ ! -d "$3" ]; then
+            mkdir $3;
+        fi;
+        (
+         blue "Tarring on $remote";
+         echo "ssh -i $sshprivatekey $PL_USER@$remote \"rm -f $PL_ALL_TAR_DIR/$PL_ALL_TAR 2>/dev/null;
+                            cd $PL_OUTPUT;
+                            tar -zcf $PL_ALL_TAR_DIR/$PL_ALL_TAR $remote-$PL_ALL_TAR $remote\\\"_\\\"* BC-*-\$HOSTNAME 2>/dev/null;\"";
+
+         ssh -i $sshprivatekey $PL_USER@$remote "rm -f $PL_ALL_TAR_DIR/$PL_ALL_TAR 2>/dev/null;
+                            cd $PL_OUTPUT;
+                            tar -zcf $PL_ALL_TAR_DIR/$PL_ALL_TAR $remote-$PL_ALL_TAR $remote\"_\"* BC-*-\$HOSTNAME 2>/dev/null;";
+         blue "Retreiving from $remote";
+         scp -i $sshprivatekey $PL_USER@$remote:$PL_ALL_TAR_DIR/$PL_ALL_TAR $3/$remote-$PL_ALL_TAR;
+        ); # &
+    elif [ "$command" = "EXEC" ]; then
+        if [ -z "$3" ]; then
+            red "Missing script to execute";
+            exit -1; fi
+        script=$3;
+        (output=`echo "from $remote: "; ssh -i $sshprivatekey $PL_USER@$remote "$3"`;
+        blue $output;)&
+    elif [ "$command" = "GREP" ]; then
+        if [ -z "$3" ]; then
+            red "Missing string to grep for!";
+            exit -1; fi
+        (shift; shift; output=`echo "from $remote: "; ssh -i $sshprivatekey $PL_USER@$remote "grep $* $PL_OUTPUT_BCS"`;
+        blue $output;)&
+    elif [ "$command" = "TAR" ]; then
+        if [ -z "$3" ]; then
+            red "No destination dir specified!";
+            exit -1;
+        elif [ ! -d "$3" ]; then
+            mkdir -p $3 2>/dev/null;
+        fi;
+        (plab_tar $remote $3)&
+    elif [ "$command" = "EXEC" ]; then
+        if [ -z "$3" ]; then
+            red "Missing script to execute";
+            exit -1; fi
+        script="$3";
+        (output=`ssh -i $sshprivatekey $PL_USER@$remote "$3"`;
+        blue $output;)&
+    else
+        red "Unknown command: $command.";
+        exit -1;
+    fi
+done
+
+wait;
+
+MAX_IDLE_CPU="70";
+MIN_IDLE_CPU="40";
+if [ "$command" = "PROBE" ]; then
+    echo -en "$timestamp " >> $probesdir/.probingtimes;
+    for prb in `ls -d $probesdir/top.out-*-$timestamp`; do
+        idle="`get_idle_cpu $prb`";
+        if [ "$idle" -gt $MAX_IDLE_CPU ]; then
+           blue -e "`basename $prb` \t $idle";
+        elif [ "$idle" -lt $MIN_IDLE_CPU ]; then
+           red -e "`basename $prb` \t $idle";
+        else
+           blue -e "`basename $prb` \t $idle"; fi
+    done
+elif [ "$command" = "TARALL" ]; then
+    initialdir=`pwd`;
+    cd $3;
+    for tg in `ls *all.tar.gz`;do blue $tg;tar -zxf $tg;done
+    cd $initialdir;
+fi

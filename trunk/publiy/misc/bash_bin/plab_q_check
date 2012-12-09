@@ -1,0 +1,62 @@
+#! /bin/bash
+
+if [ -z "$1" ]; then
+	red "No remote address specified!";
+	exit -1;
+else
+	remote=$1;
+fi;
+
+if [ -z "$2" ]; then
+	red "No data directory specified!";
+	exit -1;
+else
+	datadir=$2;
+fi
+
+# Local Variables
+ft=utoronto_jacobsen_ft
+localrepo="/home/$ft/localrepo";
+javatar="$localrepo/java32.tar.gz";
+setup="$localrepo/setup/";
+sshprivatekey="$localrepo/.ssh/pl.id_rsa";
+sshpubkey="$localrepo/.ssh/pl.id_rsa.pub";
+
+# Remote Variables
+PL_HOME=/home/$ft;
+PL_REPO=$PL_HOME/localrepo;
+PL_LIB=$PL_REPO/lib;
+PL_SETUP=$PL_REPO/setup;
+PL_JAVADIR=$PL_HOME/java;
+PL_JAVATAR=$PL_REPO/`basename $javatar`;
+PL_SDIR=$PL_HOME/System
+PL_SJAR=$PL_SDIR/System.jar;
+PL_BINDIR=$SDIR;
+PL_PATH=.:$PL_JAVADIR/bin;
+PL_CLASSPATH=$PL_SJAR;
+PL_OUTPUTS=$PL_SDIR/outputs;
+PL_DAEMON=$PL_LIB/daemon;
+PL_DATA=$PL_SDIR/data;
+PL_DATA_DESCRIPTOR=$PL_DATA/data_descriptor;
+
+#! Now start
+local_sjar_version=`get_sjar_version`;
+remote_sjar_version=`ssh -i $sshprivatekey $ft@$remote "source ~/.bash_profile; java -cp $PL_SJAR sutils.SystemPackageVersion"`;
+if [ -z "$remote_sjar_version" -o `expr match "$remote_sjar_version" ".*$local_sjar_version.*"` -eq 0 ]; then
+	blue "UPLOADING system ($remote)";
+	scp -i $sshprivatekey `cygpath $sjar` $ft@$remote:$PL_SDIR;
+fi
+
+local_data_version=`cat $datadir/data_descriptor`;
+green "Local data: $local_data_version";
+remote_data_version=`ssh -i $sshprivatekey $ft@$remote "if [ -f \"$PL_DATA_DESCRIPTOR\" ]; then cat $PL_DATA_DESCRIPTOR; elif [ ! -d \"$PL_DATA\" ]; then echo NONE; mkdir $PL_DATA; fi"`;
+green "Remote data: $remote_data_version";
+if [ -z "$remote_data_version" -o `expr match "$remote_data_version" ".*$local_data_version.*"` -eq 0 ]; then
+	blue "UPLOADING data ($remote)";
+	ssh -i $sshprivatekey $ft@$remote "sudo rm -rf $PL_DATA; mkdir $PL_DATA";
+	chmod +rwx $datadir;
+	chmod +rw $datadir/*;
+	scp -i $sshprivatekey $datadir/* $ft@$remote:$PL_DATA/;
+fi
+
+

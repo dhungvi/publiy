@@ -1,0 +1,9 @@
+#! /bin/bash
+
+if [ ! -r "$1" ]; then
+    red "File not specified/not readable ($0)";
+    exit -1; fi
+file="$1";
+
+awk '/DELIV/{print gensub(/.*Seq\[([[:digit:]]*):_([[:digit:]]*)\].*/, "Seq \\1 \\2", 1);}' $file;
+

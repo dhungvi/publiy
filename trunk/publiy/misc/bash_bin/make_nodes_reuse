@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    workingdir="`pwd`";
+elif [ -d "$1" ]; then
+    workingdir="$1"
+else
+    red "Missing working dir"; 
+    exit -1; fi
+    
+names=`awk '{printf $3" "}' $workingdir/nodes.good`
+green "$names"
+ips_col_names=`ssh reza@master.msrg.utoronto.ca "source ~/.bash_profile; host_lookup_all $names"`;
+green "$ips_col_names"
+
+ips=`echo $ips_col_names | awk 'BEGIN{FS=":";RS=" "}{print $2}'`
+
+echo "$ips" > $workingdir/nodes.reuse
+

@@ -1,0 +1,44 @@
+#!/bin/bash
+
+function check_for_dups_in_BC() {
+    local file="$1";
+    tmp_rcv_seq $file | awk '{if(seq[$2,$3])print "DUPLICATE:"$0; seq[$2,$3]=1;}'
+}
+
+function check_for_dups_in_deliv() {
+    local file="$1";
+    awk '/Seq/{seq=gensub(/.* Seq\[([[:digit:]]*):_([[:digit:]]*)\]/, "\\1_\\2", 1); if(seqs[seq]==1) print "DUPLICATE: "$0; seqs[seq]=1}' $file | red ;
+}
+
+if [ -z "$1" ]; then
+    red "No arguments given. Specify the directory containing delivery files, or BC files."
+    exit -1;
+elif [ -d "$1" ]; then
+    workingdir="$1"
+    deliv_file_count="0`ls -d $workingdir/*.deliv 2>/dev/null | wc -l`";
+    red  $deliv_file_count;
+    if [ $deliv_file_count -eq 0 ]; then
+	for file in `ls -d $1/BC*`; do
+            blue $file; 
+            check_for_dups_in_BC $file;
+	done;
+    else
+	for file in `ls -d $1/*.deliv`; do
+            blue $file; 
+            check_for_dups_in_deliv $file;
+        done
+    fi
+else
+    while [ -f "$1" ]; do
+        file="$1";
+        yellow "$file `wc -l $file | awk '{print $1}'`";
+        blue $file; 
+        if [ `expr match "$file" ".*\.deliv" ` -ne 0 ]; then
+            check_for_dups_in_deliv $file;
+        else
+            check_for_dups_in_BC $file;
+        fi;
+        shift;
+    done
+fi
+	

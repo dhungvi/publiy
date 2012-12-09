@@ -1,0 +1,6 @@
+#!/bin/awk -f 
+
+BEGIN{RS="\n"; FS="[ |\t]"} { if($0~/Generated/) {genTime=$3}    if($0~/Received/){recTime=$3; print "\t",recTime-genTime} }
+
+
+

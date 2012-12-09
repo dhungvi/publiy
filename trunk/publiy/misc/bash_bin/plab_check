@@ -1,0 +1,55 @@
+#! /bin/bash
+
+if [ -z "$1" ]; then echo "No anchor specified!"; exit -1;fi
+anchor=$1;
+if [ -z "$2" ]; then echo "No destination specified!"; exit -1;fi
+remote=$2;
+if [ ! -z "$3" ]; then sjarversion=$3; fi
+
+
+SSH_TIMEOUT=20;
+
+# Local Variables
+localrepo="/home/$ft/localrepo";
+javatar="$localrepo/java32.tar.gz";
+setup="$localrepo/setup/";
+sshprivatekey="$localrepo/.ssh/pl.id_rsa";
+sshpubkey="$localrepo/.ssh/pl.id_rsa.pub";
+bindir="$localrepo/setup/bin";
+
+# Remote Variables
+PL_USER="$ft";
+PL_HOME=/home/$PL_USER;
+PL_REPO=$PL_HOME/localrepo;
+PL_LIB=$PL_REPO/lib;
+PL_SETUP=$PL_REPO/setup;
+PL_JAVADIR=$PL_HOME/java;
+PL_JAVATAR=$PL_REPO/`basename $javatar`;
+PL_SDIR=$PL_HOME/System
+PL_SJAR=$PL_SDIR/System.jar;
+PL_PATH=.:$PL_JAVADIR/bin;
+PL_CLASSPATH=$PL_SJAR;
+PL_OUTPUTS=$PL_SDIR/outputs;
+PL_DATA=$PL_SDIR/data;
+PL_BIN=$PL_HOME/bin;
+
+# Check remote
+setupexists=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $PL_USER@$remote "if [ -d $PL_SETUP ]; then echo 'EXISTS'; else if [ ! -d \"$PL_REPO\" ]; then rm -rf $PL_REPO; elif [ ! -d \"$PL_SETUP\" ]; then rm -rf $PL_SETUP; fi; echo 'NONE'; mkdir -p $PL_REPO; fi"`;
+setupexists="NONE";
+if [ "$setupexists" = "EXISTS" ]; then echo "USING existing setup."; else echo "UPLOADING setup"; scp -r -i $sshprivatekey $PL_SETUP $PL_USER@$remote:$PL_REPO; scp -r -i $sshprivatekey $bindir $PL_USER@$remote:`dirname $PL_BIN`; scp -i $sshprivatekey -r `dirname $sshprivatekey` $PL_USER@$remote:$PL_REPO; ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $PL_USER@$remote "cp $PL_SETUP/.bash* $PL_HOME;"; fi;
+
+javaexists=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $PL_USER@$remote "if [ -d $PL_JAVADIR ]; then echo 'EXISTS'; else echo 'NONE'; fi"`;
+if [ "$javaexists" = "EXISTS" ]; then echo "USING existing java."; else echo "UPLOADING java"; scp -i $sshprivatekey "$javatar" $PL_USER@$remote:$PL_REPO; ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $PL_USER@$remote "tar -zxf $PL_JAVATAR -C $PL_HOME"; fi;
+
+libexists=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $PL_USER@$remote 'if [ -d '$PL_LIB' ]; then if [ -s "'$PL_LIB/bindtest.exe'" ]; then echo "EXISTS"; else echo "NONE"; fi else echo "NONE"; fi;'`;
+if [ "$libexists" = "NONE" ]; then echo "UPLOADING lib"; scp -r -i $sshprivatekey $PL_LIB $PL_USER@$remote:$PL_REPO; ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $PL_USER@$remote 'ARCH=`arch`; if [ `expr match "$ARCH" ".*_64*"` -ne 0 ]; then ln -s '$PL_LIB'/bindtest/linux64/bindtest.exe '$PL_LIB'/bindtest.exe; ln -s '$PL_LIB'/64bit/libJNI_CPU_C.so '$PL_LIB'/libJNI_CPU_C.so; else ln -s '$PL_LIB'/bindtest/linux32/bindtest.exe '$PL_LIB'/bindtest.exe; ln -s '$PL_LIB'/32bit/libJNI_CPU_C.so '$PL_LIB'/libJNI_CPU_C.so; fi; tar -zxf '$PL_LIB'/daemon.tar.gz -C '$PL_LIB' '; else echo "USING lib.";fi;
+
+systemexists=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $PL_USER@$remote 'source $HOME/.bash_profile; if [ ! -d '$PL_SDIR' ]; then echo NONE; rm -rf '$PL_SDIR'; mkdir -p '$PL_OUTPUTS'; ln -s '$PL_LIB/System.jar' '$PL_SJAR'; elif [ -f '$PL_SJAR' ]; then echo EXISTS {\`java -cp '$PL_CLASSPATH' sutils.SystemPackageVersion\`}; else echo NONE; fi;'`;
+if [ ! -z "$sjarversion" ]; then 
+	if [ "$systemexists" = "NONE" -o `expr match "$systemexists" ".*$sjarversion.*"` -eq 0 ]; then echo "UPLOADING sjar{$sjarversion}"; scp -i $sshprivatekey $PL_LIB/System.jar $PL_USER@$remote:$PL_LIB; else echo "USING existing system{$sjarversion}."; fi
+fi
+exit 0;
+
+dataexists=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $ft@$remote 'rm -rf $PL_DATA; mkdir -p $PL_DATA; echo NONE;'`;
+if [ `expr match "$dataexists" ".*NONE.*"` -gt 0 ]; then echo "UPLOADING data: scp -r -i $sshprivatekey $PL_DATA $ft@$remote:$PL_SDIR;"; scp -i $sshprivatekey $PL_DATA/* $ft@$remote:$PL_DATA/; else echo "USING data."; fi
+

@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then 
+    echo "Working dir missing ($0)";
+    exit -1; fi
+workingdir="$1";
+
+TMP=$(mktemp);
+blue "Tempfile: $TMP";
+
+setupscript="/home/Reza/localrepo/setup/plab_check.sh";
+localip=`get_local_ip $workingdir`;
+nodes=`plab_test_java $workingdir | tee --append $TMP | awk '{if ($2!=46036) printf $1" "}'`;
+
+# nodes="129.237.161.193 160.36.57.173 216.165.109.82 12.108.127.138 152.3.138.4 128.59.20.226 128.59.20.227 132.239.17.225 137.189.97.18";
+echo "NEED installation nodes $nodes";
+
+for node in $nodes; do
+    echo "Installing on $node...";
+    (
+        /home/Reza/localrepo/setup/plab_check.sh $localip $node;
+        echo "DONE on $node";
+    );
+done
+
+wait;
+

@@ -1,0 +1,53 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    echo "Missing working dir or labtype"; exit -1; fi
+
+if [ "$1" = "ML" ]; then
+    labtype="ML";
+elif [ "$1" = "CL" ]; then
+    labtype="CL";
+elif [ "$1" = "CL_NO_AFF" ]; then
+    labtype="CL_NO_AFF";
+elif [ "$1" = "PL" ]; then
+    labtype="PL";
+elif [ -d "$1" ]; then
+    workingdir="$1";
+    labtypefile="$workingdir/.labtype";
+    if [ ! -f "$labtypefile" ]; then
+        echo ".labtype file is missing in $workingdir ($0)";
+    exit -1; fi
+    labtype=`cat $labtypefile`;
+fi
+
+
+if [ "$labtype" = "SL" ]; then
+    echo -en "127.0.0.1";
+elif [ "$labtype" = "ML" ]; then
+    echo -en "127.0.0.1";
+elif [ "$labtype" = "CL" -o "$labtype" = "CL_NO_AFF" ]; then
+    # MSRG (OpenVPN)
+    echo -en "192.168.237.10";
+
+    # MSRG (Lab)
+    # echo -en "142.150.237.161";
+elif [ "$labtype" = "PL" ]; then
+    # MSRG (Lab) - does NOT work
+    # echo -en "142.150.237.161";
+    # local=142.1.193.213;
+
+    # COLUBRIS
+    # echo "128.100.70.41"
+
+    # HOME (4K Spadina)
+    # (old) echo "209.29.23.245";
+    # echo "209.29.21.23";
+
+    # GERSTEIN
+    echo -en "142.1.193.73"
+    # echo -en "142.1.194.175";
+    # echo -en "142.1.195.101";
+else
+    echo "Wrong labtype=$labtype ($0)";
+    exit -1;
+fi

@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Working dir is missing ($0)";
+    exit -1; fi
+workingdir="$1";
+
+if [ ! -d "$2" ]; then
+    red "Destination dir is missing ($0)";
+    exit -1; fi
+destdir="$2";
+
+
+cp $workingdir/README* $destdir;
+cp $workingdir/.summaries* $destdir;
+cp $workingdir/`basename $workingdir`_table.csv $destdir;
+
+for dir in `ls -d $workingdir/DT*/`; do
+    make_backup $dir $destdir;
+done
+
+

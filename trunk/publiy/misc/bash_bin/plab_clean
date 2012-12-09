@@ -1,0 +1,7 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then echo "Missing remote"; exit -1; else remote=$1; fi;
+
+echo "Cleaning remote $remote";
+ssh -i ~/.ssh/pl.id_rsa $ft@$remote 'rm -fr ~/*';
+

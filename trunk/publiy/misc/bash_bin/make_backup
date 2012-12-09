@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Working directory is unaccessible ($0)";
+    exit -1; fi
+workingdir="$1";
+
+if [ ! -d "$2" ]; then
+    red "No destination dir specified ($0)";
+    exit -1; fi
+
+destdir="$2/`basename $workingdir`";
+if [ -d "$destdir" ]; then
+    red "Destination dir $destdir exists ($0)";
+    exit -1; fi
+
+green "Moving $workingdir -> $destdir";
+mkdir -p $destdir;
+
+mv $workingdir/*.tar.gz $destdir;
+cp -r $workingdir/*/ $destdir 2>/dev/null;
+mv $workingdir/*.properties $destdir;
+mv $workingdir/*.sh $destdir;
+cp $workingdir/summed* $destdir;
+cp $workingdir/delivery_* $destdir;
+cp $workingdir/send_received_dataset $destdir;
+cp $workingdir/avg_send_received $destdir;

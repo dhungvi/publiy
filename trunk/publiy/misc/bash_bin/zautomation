@@ -1,0 +1,217 @@
+#!/bin/bash
+
+source common.sh
+source common_automation.sh
+
+if [ ! -d "$1" ]; then
+    red "Invalid working directory: $1";
+    exit -2; fi
+workingdir="$1";
+
+if [ -z "$2" ]; then
+    red "Destination directory is missing!";
+    exit -1; fi
+destinationdir="$2";
+skip_count=0;   ### Change this value for skipping initial executions.
+skip_counter=0;
+if [ "$3" = "RENEW" ]; then
+    renew="$3";fi
+
+export guiAutomation="true";
+check_files $workingdir .labtype .inbw .outbw .tickscaler .datasets
+if [ $? -ne 0 ]; then
+    red "MISSING some files :(";
+    exit -1; fi
+
+# Check .labtype
+if [ "`cat $workingdir/.labtype`" != "PL" ]; then
+    red "PL not specified in .labtype ($0)";
+    exit -1; fi
+
+
+export guiAutomation="true";
+datasets=`awk '!/\#/{printf "'$workingdir'/"\$0" "}' $workingdir/.datasets`;
+
+sdelay="200";
+startdate="`date`";
+yellow "STARTING @$startdate";
+
+(
+for II in `seq 1 12`; do
+    if [ $II -eq 1 ]; then
+         echo "backup_ready_delta3_fanout10/" > $workingdir/.reuse;
+    elif [ $II -eq 3 ]; then
+         echo "backup_ready_delta3_fanout15/" > $workingdir/.reuse;
+    elif [ $II -eq 5 ]; then
+         echo "backup_ready_delta2_fanout10" > $workingdir/.reuse;
+    elif [ $II -eq 7 ]; then
+         echo "backup_ready_delta2_fanout15/" > $workingdir/.reuse;
+    elif [ $II -eq 9 ]; then
+        echo "backup_ready_delta1_fanout10" > $workingdir/.reuse;
+    elif [ $II -eq 11 ]; then
+         echo "backup_ready_delta1_fanout15/" > $workingdir/.reuse;
+    fi
+
+for dataset in $datasets; do 
+    dataset=${dataset:0:`expr match "$dataset" "[^#]*"`};
+    if [ "$dataset" = "" ]; then continue; fi
+    newdataset="1";
+for pdelay in 100; do
+    echo "PDELAY => $pdelay" >> $destinationdir/.summaries;
+for brokerStrategyNo in 2 3; do
+for brokerDelta in 3; do
+
+    if [ $((++skip_counter)) -lt $skip_count ]; then red "Skipping D$brokerDelta, STR$brokerStrategyNo, sdelay=$sdelay, pdelay=$pdelay, dataset={$datasetdescriptor}"; continue; fi;
+
+# WHILE_REPEAT
+while [ "1" = "1" ]; do
+    ############################
+    # SLEEP if .stop is requested.
+
+    wait_on_stop;
+
+
+    ############################
+    # INSTALL on new nodes new goodnodes.
+
+    requirednodescount="`ls $workingdir/backup/*.properties 2>/dev/null | wc -l | awk '{print \$1}'`";
+    goodnodescount="0`wc -l $workingdir/nodes.good 2>/dev/null | awk '{print \$1}'`";
+    if [ ! -f "$workingdir/nodes.reuse" ]; then
+        if [ ! -f "$workingdir/nodes.good" -o "$goodnodescount" -lt "$requirednodescount" -o ! -f "$workingdir/.reuse" -o "`cat $workingdir/.reuse`" != "YES" ]; then
+        yellow "INSTALLING";
+            # rm -f $workingdir/nodes.good;
+            # rm -f $workingdir/nodes.sorted;
+            plab_q_install $workingdir;
+            make_nodes_reuse $workingdir;
+        else
+            yellow "REUSING nodes"; fi
+    else
+        green "RESUING nodes.reuse";
+    fi
+    cat $workingdir/nodes.reuse > $workingdir/nodes.used
+
+    brokerStrategy="STR$brokerStrategyNo";
+    datasetdescriptor="`cat $dataset/data_descriptor`";
+    echo "$pdelay" > "$workingdir/.pdelay";
+    echo "$sdelay" > "$workingdir/.sdelay";
+    yellow "RUNNING with D$brokerDelta, STR$brokerStrategyNo, sdelay=$sdelay, pdelay=$pdelay, dataset={$datasetdescriptor}";
+    echo "$datasetdescriptor">$workingdir/.useddataset;
+    echo "$brokerStrategyNo">$workingdir/.strategy;
+
+    ############################
+    # GENERATE PROPERTY FILES
+
+    if [ "$repeat" = "1" ]; then
+        green "SKIPPING chaning delays";
+    else
+        if [ 1 -eq 1 -a -f "$workingdir/.reuse" ]; then
+            reusedir="`cat $workingdir/.reuse`";
+            while [ ! -d "$reusedir" ]; do
+                stopthis $workingdir;
+                wait_on_stop;
+            done
+            yellow "REUSING $reusedir/properties & deploy-*.sh";
+            cp $workingdir/$reusedir/*.properties .;
+            cp $workingdir/$reusedir/deploy*.sh .;
+        else
+            yellow "GENERATING property files ... ";
+            generate_property_files $workingdir;
+            green -en "DONE.\n";
+    
+            # Change deploy files
+            yellow "CHANGING deploy files ";
+            plab_change_all $workingdir;
+            green -en "DONE.\n";
+        fi
+    fi
+
+    yellow "CHANGING delays";
+    for prop in `grep "SubFilenames" $workingdir/*.properties | awk 'BEGIN{FS=":"}{printf $1" "}'`; do
+        change_pubsub_delay $sdelay $prop; done
+    for prop in `grep "PubFilenames" $workingdir/*.properties | awk 'BEGIN{FS=":"}{printf $1" "}'`; do
+        change_pubsub_delay $pdelay $prop; done
+    green "DONE.";
+    
+    # QCHECK plab nodes.
+    yellow "QCHECK on planetlab...";
+    plab_all $workingdir QCHECK $dataset;
+    green -en "DONE.\n";
+    sleep 5;
+
+    repeat="0";
+    if [ "$newdataset" = "1" ]; then
+        # wait for sync on remote nodes
+        newdataset="0";
+        sleep 30; fi
+
+    ############################
+    # NOW RUN
+
+
+# SKIP SKIP SKIP
+if [ 0 -eq 0 ]; then
+    # remote_sjar_version=`ssh -i $sshprivatekey $PL_USER@$PL_MASTER "java -cp $PL_SJAR sutils.SystemPackageVersion"`
+    # green "USED_SJAR_VERSION: $remote_sjar_version";
+    echo "`get_sjar_version`" > $workingdir/.usedsjarversion;
+    echo "$skip_counter" > $workingdir/.execution_number;
+    yellow "DEPLOY on planetlab...";
+    plab_all $workingdir DEPLOY;
+    green -en "DONE.\n";
+    sleep 10;
+
+    yellow "SEEEX on planetlab...";
+    plab_all $workingdir SEEEX;
+    green -en "DONE.\n";
+
+    for i in `seq 1 6`; do blue -en "$i.";sleep 5;done 
+
+    yellow "NOW GO...";
+    gui $workingdir &
+    autoGuiPID="$!";
+    yellow "WAITING for gui(pid=$autoGuiPID)";
+    wait $autoGuiPID;
+    green "Done with gui(return=$?)";
+else
+    red "SKIPPING deploy & gui";
+    exit 0;
+fi
+
+    yellow "KILLING all remaining";
+    plab_all $workingdir KILL;
+
+
+    ############################
+    # REPEAT?
+
+    if [ -f "$workingdir/.repeat" -a "`cat $workingdir/.repeat`" = "YES" ]; then
+        yellow "REPEATING"; unrepeatthis "$workingdir";
+        unrepeatthis "$workingdir";
+        repeat="1";
+    else
+        break; fi
+done; # WHILE_REPEAT
+
+
+    yellow "WAITING for disks sync: ";
+    for i in `seq 1 4`; do blue -en "$i.";sleep 5;done 
+
+
+    ############################
+    # NOW MOVE STUFF
+
+    yellow "MOVEZ"
+    movez $workingdir $destinationdir;
+
+    green -en "\nCOMPLETE @`date`. \n\n\n";
+
+done;
+done;
+done;
+done;
+done;
+) &
+
+just_wait $!;
+
+green "ENDING @`date`";
+

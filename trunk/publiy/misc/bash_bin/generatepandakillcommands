@@ -1,0 +1,12 @@
+#!/bin/bash
+
+sleep 10;
+echo deploy;
+
+sleep 5;
+echo y;
+
+sleep 5;
+echo a;
+
+sleep 10;

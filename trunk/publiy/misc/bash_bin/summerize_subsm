@@ -1,0 +1,1 @@
+awk '/===/{for(x in subs) if(subs[x]!=0){print x,subs[x]; subs[x]=0;} print;}!/===/{subs[$4]++;}' $1

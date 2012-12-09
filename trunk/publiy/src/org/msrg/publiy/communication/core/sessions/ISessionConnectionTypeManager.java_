@@ -1,0 +1,123 @@
+package communication.core.sessions;
+
+import java.net.InetSocketAddress;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.Map.Entry;
+
+// Helper Class.
+public class ISessionConnectionTypeManager {
+	
+	private Map<ISession, ISession> _replacing_to_repalced = new HashMap<ISession, ISession>();
+	
+	public Set<ISession> getReplacingSessionsFromAllSessions(ISession replacedSession){
+		if ( replacedSession.getSessionConnectionType() != SessionConnectionType.S_CON_T_BEINGREPLACED )
+			throw new IllegalArgumentException("ReplacedSession '" + replacedSession.getRemoteAddress() + "' is not S_CON_T_BEINGREPLACED.");
+		
+		Set<ISession> allReplacing = new HashSet<ISession>();
+		Set<Entry<ISession, ISession>> set = _replacing_to_repalced.entrySet();
+		Iterator<Entry<ISession, ISession>> it = set.iterator();
+		while ( it.hasNext() )
+		{
+			Entry<ISession, ISession> entry = it.next();
+			ISession replaced = entry.getValue();
+			ISession replacing = entry.getKey();
+			
+			if ( replacing.getSessionConnectionType() != SessionConnectionType.S_CON_T_REPLACING )
+				throw new IllegalStateException("The registered replacing session '" + replacing.getRemoteAddress() + "' is not S_CON_T_REPLACING.");
+			
+			if ( replaced.equals(replacedSession) )
+				allReplacing.add(replacing);
+		}
+		return allReplacing;
+	}
+
+	private Set<ISession> getReplacingSessionsForBeingReplacedSession(ISession beingReplacedSession){
+		SessionConnectionType beingReplacedSessionConnectionType = beingReplacedSession.getSessionConnectionType();
+		if ( beingReplacedSessionConnectionType != SessionConnectionType.S_CON_T_BEINGREPLACED &&
+			 beingReplacedSessionConnectionType != SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+			throw new IllegalStateException("Replacing session '" + beingReplacedSession.getRemoteAddress() + "' is not S_CON_T_REPLACING; it is " + beingReplacedSessionConnectionType);
+		
+		Set<ISession> replacingSessions = new HashSet<ISession>();
+		
+		Set<Entry<ISession, ISession>> set = _replacing_to_repalced.entrySet();
+		Iterator<Entry<ISession, ISession>> it = set.iterator();
+		while ( it.hasNext() )
+		{
+			Entry<ISession, ISession> entry = it.next();
+			ISession replacingSession = entry.getKey();
+			ISession replacedSession = entry.getValue();
+			
+			if ( replacedSession == beingReplacedSession )
+			{
+				if ( replacingSession.getSessionConnectionType() != SessionConnectionType.S_CON_T_REPLACING && 
+					 replacingSession.getSessionConnectionType() != SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+					throw new IllegalStateException("Beingreplaced session's '" + beingReplacedSession + "' replacing session '" + replacingSession + "' is not S_CON_T_REPLACING. It is " + replacingSession.getSessionConnectionType() + ".");
+				
+				replacingSessions.add(replacingSession);
+			}
+		}
+		
+		return replacingSessions;
+	}
+
+	protected void replaceOldSessionWithNewSession(ISession oldSession, ISession newSession){
+		SessionConnectionType oldSessionConnectionType = oldSession.getSessionConnectionType();
+
+		if ( oldSessionConnectionType == SessionConnectionType.S_CON_T_BEINGREPLACED ||
+				 oldSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+			{
+				Set<ISession> replacingSessions = getReplacingSessionsForBeingReplacedSession(oldSession);
+				Iterator<ISession> it = replacingSessions.iterator();
+				while ( it.hasNext() ){
+					ISession replacingSession = it.next();
+					ISession replacedSession = _replacing_to_repalced.remove(replacingSession);
+					if ( replacedSession != oldSession )
+						throw new IllegalStateException("BeingReplaced Session does not match oldSession '" + oldSession.getRemoteAddress() + "'.");
+					_replacing_to_repalced.put(replacingSession, newSession);
+				}
+			}
+			
+			if ( oldSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING ||
+				 oldSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+			{
+				ISession replacedSession = _replacing_to_repalced.remove(oldSession);
+				_replacing_to_repalced.put(newSession, replacedSession);
+			}
+			
+			newSession.setSessionConnectionType(oldSessionConnectionType);
+	}
+	
+	private void testBeingReplacedSession(Map<InetSocketAddress, ISession> allSessions, ISession beingReplacedSession){
+		if ( beingReplacedSession == null )
+			return;
+		
+		ISession replacingABeingReplacedSessionAsWell = null;
+		
+		SessionConnectionType sessionConnectionType = beingReplacedSession.getSessionConnectionType();
+		if ( sessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+			replacingABeingReplacedSessionAsWell = _replacing_to_repalced.get(beingReplacedSession);
+		else if ( sessionConnectionType != SessionConnectionType.S_CON_T_BEINGREPLACED )
+			throw new IllegalStateException("beingReplacedSession is neither BEINGREPLACED/nor REPLACING_BEINGREPLACED, it is '" + sessionConnectionType );
+	
+		Set<ISession> replacingSessions = getReplacingSessionsForBeingReplacedSession(beingReplacedSession);
+		
+		if ( replacingSessions.size() == 0 && allSessions.containsKey(beingReplacedSession.getRemoteAddress())){
+			ISession registeredbeingReplaced = allSessions.remove(beingReplacedSession.getRemoteAddress());
+			if ( registeredbeingReplaced != beingReplacedSession )
+				throw new IllegalStateException("BeingregisteredSession '" + beingReplacedSession.getRemoteAddress() + "' does not match the one in allSessions.");
+			
+			Set<ISession> mqRemovedSet = new HashSet<ISession>();
+			mqRemovedSet.add(beingReplacedSession);
+			allSessions.remove(beingReplacedSession.getRemoteAddress());
+			beingReplacedSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+//			_mq.replaceSessions(mqRemovedSet, null);
+			
+			_replacing_to_repalced.remove(beingReplacedSession);
+			testBeingReplacedSession(allSessions, replacingABeingReplacedSessionAsWell);
+		}
+	}
+}

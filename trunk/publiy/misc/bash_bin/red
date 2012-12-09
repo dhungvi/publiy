@@ -1,0 +1,12 @@
+#!/bin/bash
+
+clr="31";
+
+if [ "$#" -gt 0 ]; then
+    echo -en "\e[01;"$clr"m";
+    echo $*;
+    echo -en "\e[0m";
+else
+    color $clr;
+fi
+

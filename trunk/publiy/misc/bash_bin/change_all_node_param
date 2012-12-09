@@ -1,0 +1,23 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    red "Missing deploy file";
+    exit -1; fi
+deployfile="$1";
+if [ ! -f "$deployfile" ]; then
+    red "Deploy file does not exist";
+    exit -1; fi;
+
+if [ -z "$2" ]; then
+    red "No param specified";
+    exit -1; fi
+
+
+LINE_INDENT="    ";
+LINE_START="# Deploy entries for ALL nodes";
+shift;
+for param in $@; do
+    params="\n$LINE_INDENT$param;$params";
+done
+
+sed -e "s/$LINE_START\(.*\)/$LINE_START\1$params/" $deployfile;

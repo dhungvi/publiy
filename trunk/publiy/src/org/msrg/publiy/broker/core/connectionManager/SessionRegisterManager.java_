@@ -1,0 +1,1044 @@
+package broker.core.connectionManager;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Map.Entry;
+
+import broker.info.ISessionInfo;
+
+import pubsub.core.IOverlayManager;
+import pubsub.core.messagequeue.IMessageQueue;
+import pubsub.core.overlaymanager.OverlayNode;
+import pubsub.core.overlaymanager.Path;
+
+import utils.log.ILoggerSource;
+import utils.log.LoggerFactory;
+import utils.log.LoggingSource;
+
+import communication.core.niobinding.IConInfoNonListening;
+import communication.core.sessions.ISession;
+import communication.core.sessions.ISessionLocal;
+import communication.core.sessions.ISessionManager;
+import communication.core.sessions.SessionConnectionType;
+
+public class SessionRegisterManager extends Thread implements ISessionRegisterManager, ILoggerSource {
+
+	private Map<ISession, ISession> _replacing_to_repalced = new HashMap<ISession, ISession>();
+	private Map<InetSocketAddress, ISession> _allSessions = new HashMap<InetSocketAddress, ISession>();
+	
+	SessionRegisterManager(String name){
+		super(name);
+	}
+
+	@Override
+	public ISessionInfo[] getSessions() {
+		Set<ISessionInfo> sessionInfos = new HashSet<ISessionInfo>();
+
+		synchronized (_allSessions) {
+			Set<Entry<InetSocketAddress, ISession>> sessionsEntrySet = _allSessions.entrySet();
+			Iterator<Entry<InetSocketAddress, ISession>> sessionsIt = sessionsEntrySet.iterator();
+			while ( sessionsIt.hasNext() )
+			{
+				Entry<InetSocketAddress, ISession> entry = sessionsIt.next();
+				ISession session = entry.getValue();
+				if (session!=null && !ISessionLocal.class.isInstance(session) )
+					sessionInfos.add(session.getInfo());
+			}
+		}
+
+		return sessionInfos.toArray(new ISessionInfo[0]);
+	}
+	
+	@Override
+	public Map<InetSocketAddress, ISession> getAllSessions(){
+		return _allSessions;
+	}
+	
+	@Override
+	public ISession[] getAllSessionsArray(){
+		synchronized(_allSessions){
+			return _allSessions.values().toArray(new ISession[0]);
+		}
+	}
+	
+	@Override
+	public void addAllSessionsForFirstRevision(ConnectionManager connManager){
+		synchronized (_allSessions) {
+			Set<Entry<InetSocketAddress, ISession>> entrySet = _allSessions.entrySet();
+			Iterator<Entry<InetSocketAddress, ISession>> entrySetIt = entrySet.iterator();
+			while ( entrySetIt.hasNext() )
+			{
+				Entry<InetSocketAddress, ISession> entry = entrySetIt.next();
+				ISession session = entry.getValue();
+				IConInfoNonListening conInfoNL = session.getConInfoNL();
+				if ( conInfoNL != null ) {
+					connManager.conInfoGotEmptySpace(conInfoNL);
+					connManager.conInfoGotFirstDataItem(conInfoNL);
+				}
+			}
+		}
+	}
+	
+	@Override
+	public ISession[] getAllLocallyActiveSessions(){
+		synchronized(_allSessions){
+			Collection<ISession> allSessions = _allSessions.values();
+			Iterator<ISession> allSessionsIt = allSessions.iterator();
+			while ( allSessionsIt.hasNext() ){
+				ISession session = allSessionsIt.next();
+				if ( !session.isLocallyActive() )
+					allSessionsIt.remove();
+			}
+			
+			return allSessions.toArray(new ISession[0]);
+		}
+	}
+
+	@Override
+	public boolean dumpAllSessions(String sessionsDumpFileName){
+		try{
+			FileWriter fwriter = new FileWriter(sessionsDumpFileName, true);
+			fwriter.write("\n" + new Date().toString() + " \n");
+			String content = "";
+
+			Set<Entry<InetSocketAddress, ISession>> allSet = _allSessions.entrySet();
+			Iterator<Entry<InetSocketAddress, ISession>> allIt = allSet.iterator();
+			while ( allIt.hasNext() ){
+				Entry<InetSocketAddress, ISession> entry = allIt.next();
+				ISession session = entry.getValue();
+				SessionConnectionType sessionConnectionType = session.getSessionConnectionType();
+				String replacingStr = "";
+				if ( sessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED || 
+				     sessionConnectionType == SessionConnectionType.S_CON_T_REPLACING ){
+					ISession replacedSession = _replacing_to_repalced.get(session);
+					InetSocketAddress remoteAddress = replacedSession.getRemoteAddress();
+					replacingStr = " ====>>> " + remoteAddress.toString();
+				}
+				content += "\t" + //_localAddress + "   " + 
+									  session.getRemoteAddress() + "::" + sessionConnectionType + replacingStr + "\n";
+			}
+			
+			fwriter.write( content );
+			for ( int i=0 ; i<40 ; i++ )
+				fwriter.write("=");
+			
+			fwriter.close();
+		}catch (IOException iox){
+			return false;
+		}
+		return true;
+	}
+	
+	@Override
+	public ISessionInfo[] getActiveSessions() {
+		Set<ISessionInfo> sessionInfos = new HashSet<ISessionInfo>();
+
+		synchronized (_allSessions) {
+			Set<Entry<InetSocketAddress, ISession>> sessionsEntrySet = _allSessions.entrySet();
+			Iterator<Entry<InetSocketAddress, ISession>> sessionsIt = sessionsEntrySet.iterator();
+			while ( sessionsIt.hasNext() )
+			{
+				Entry<InetSocketAddress, ISession> entry = sessionsIt.next();
+				ISession session = entry.getValue();
+				if (session!=null && session.getSessionConnectionType() == SessionConnectionType.S_CON_T_ACTIVE)
+					sessionInfos.add(session.getInfo());
+			}
+		}
+
+		return sessionInfos.toArray(new ISessionInfo[0]);
+	}
+	
+	@Override
+	public ISessionInfo[] getInactiveSessions() {
+		Set<ISessionInfo> sessionInfos = new HashSet<ISessionInfo>();
+
+		synchronized (_allSessions) {
+			Set<Entry<InetSocketAddress, ISession>> sessionsEntrySet = _allSessions.entrySet();
+			Iterator<Entry<InetSocketAddress, ISession>> sessionsIt = sessionsEntrySet.iterator();
+			while ( sessionsIt.hasNext() )
+			{
+				Entry<InetSocketAddress, ISession> entry = sessionsIt.next();
+				ISession session = entry.getValue();
+				if (session!=null && session.getSessionConnectionType() == SessionConnectionType.S_CON_T_INACTIVE)
+					sessionInfos.add(session.getInfo());
+			}
+		}
+
+		return sessionInfos.toArray(new ISessionInfo[0]);
+	}
+
+
+	//_allSessions is already synchronized
+	private final boolean registerSessionPrivately(ConnectionManager connMan, ISession newSession){
+		ISession survivedSession, oldSession;
+		InetSocketAddress remote = newSession.getRemoteAddress();
+
+		if ( remote == null )
+			throw new IllegalStateException("Remote cannot be 'null' when the session is being registered.");
+		
+		// Since we do not synchronize on the newSession, it is possible that its _type chances.
+		// But it only can chance to ST_END, in which case, 'failed()' will be called (synchronized with this method).
+		if ( !newSession.isSessionTypePubSubEnabled() && !newSession.isEnded() )
+			throw new IllegalArgumentException("NewSession being registered '" + remote + "' is not PubSub enabled, '" + newSession.getSessionType() + "'."); 
+
+		Set<ISession> mqAddedSessions = new HashSet<ISession>();
+		Set<ISession> mqRemovedSessions = new HashSet<ISession>();
+
+		// Checking for double session
+		survivedSession = newSession;
+
+		oldSession = _allSessions.get(remote);	
+		
+		if ( oldSession != null && newSession != oldSession )
+		{
+			SessionConnectionType oldSessionConnectionType = oldSession.getSessionConnectionType();
+			if ( oldSessionConnectionType == SessionConnectionType.S_CON_T_BEINGREPLACED ||
+				 oldSessionConnectionType == SessionConnectionType.S_CON_T_FAILED || 
+				 oldSessionConnectionType == SessionConnectionType.S_CON_T_DROPPED )
+			{
+				survivedSession = newSession;
+			}
+			else if ( oldSession != null && newSession != oldSession ) {
+				// We have to drop either of the sessions
+				boolean oldOutgoing = oldSession.isOutgoing();
+				boolean newOutgoing = newSession.isOutgoing();
+				boolean outgoingValid = isOutgoingValid(connMan.getLocalAddress(), remote);
+				
+				LoggerFactory.getLogger().debug(this, "There has been an old session: " + oldSession );
+				
+				if ( oldOutgoing && newOutgoing )
+				{
+					throw new IllegalStateException("Cannot have two outgoing sessions to '" + remote + "'.");
+				}
+				
+				else if ( oldOutgoing && !newOutgoing )
+				{
+					if ( outgoingValid )
+					{
+						// drop newSession
+						survivedSession = oldSession;
+						newSession.setSessionConnectionType(SessionConnectionType.S_CON_T_DROPPED);
+						ISessionManager.dropSession(newSession, true);
+						return false;
+					}
+					else
+					{
+						// drop oldSession
+						survivedSession = newSession;
+						replaceOldSessionWithNewSession(oldSession, survivedSession, mqAddedSessions, mqRemovedSessions);
+						oldSession.setSessionConnectionType(SessionConnectionType.S_CON_T_DROPPED);
+						ISessionManager.dropSession(oldSession, true);
+					}
+				}
+				
+				else if ( !oldOutgoing && newOutgoing )
+				{
+					if ( outgoingValid )
+					{
+						// drop oldSession
+						survivedSession = newSession;
+						replaceOldSessionWithNewSession(oldSession, survivedSession, mqAddedSessions, mqRemovedSessions);
+						oldSession.setSessionConnectionType(SessionConnectionType.S_CON_T_DROPPED);
+						ISessionManager.dropSession(oldSession, true);
+					}
+					else
+					{
+						// drop newSession
+						survivedSession = oldSession;
+						newSession.setSessionConnectionType(SessionConnectionType.S_CON_T_DROPPED);
+						ISessionManager.dropSession(newSession, true);
+						return false;
+					}
+				}
+				
+				else if ( !oldOutgoing && !newOutgoing )
+				{
+					// drop oldSession
+					survivedSession = newSession;
+					replaceOldSessionWithNewSession(oldSession, survivedSession, mqAddedSessions, mqRemovedSessions);
+					oldSession.setSessionConnectionType(SessionConnectionType.S_CON_T_DROPPED);
+					ISessionManager.dropSession(oldSession, true);
+				}
+			}
+		}
+		
+		if ( newSession != oldSession )
+			_allSessions.put(remote, survivedSession);	
+		
+		// Don't use these references anymore.
+		oldSession = newSession = null;
+		
+		if ( _allSessions.get(remote) != survivedSession )
+			throw new IllegalStateException("Survived Session '" + remote + "'has not been registered in _allSessoins.");
+		
+		// From now on we only work with `survivedSession'
+		checkCloserSessionsWhileRegister(connMan, survivedSession, mqAddedSessions, mqRemovedSessions);
+		checkFartherSessionsWhileRegister(connMan, survivedSession, mqAddedSessions, mqRemovedSessions);
+		connMan.getMessageQueue().replaceSessions(mqRemovedSessions, mqAddedSessions);
+		
+		return true;
+	}
+
+	private void checkCloserSessionsWhileRegister(ConnectionManager connMan, ISession survivedSession, Set<ISession> mqAddedSessions, Set<ISession> mqRemovedSessions){
+		InetSocketAddress remote = survivedSession.getRemoteAddress();
+		Path<OverlayNode> pathFromRemoteSession = connMan.getMessageQueue().getOverlayManager().getPathFrom(remote);
+		
+		if ( pathFromRemoteSession == null )
+		{
+			// This can only become a S_CON_T_UNJOINED.
+			survivedSession.setSessionConnectionType(SessionConnectionType.S_CON_T_UNJOINED);
+//			_allSessions.put(remote, survivedSession);
+			mqAddedSessions.add(survivedSession);
+			return;
+		}
+
+		InetSocketAddress [] pathAddresses = pathFromRemoteSession.getAddresses();
+		if ( pathAddresses.length == 1 )
+		{
+			// No intermediate node; but still may be 'REPLACING' the local node.
+			ISession possibleLocal = _replacing_to_repalced.remove(survivedSession);
+			if ( possibleLocal != null && ISessionLocal.class.isInstance(possibleLocal) )
+			{
+				Set<ISession> replacingSessions = getReplacingSessionsForBeingReplacedSession(possibleLocal);
+				if ( replacingSessions.size() == 0 ){
+					mqRemovedSessions.add(possibleLocal);
+					_allSessions.remove(possibleLocal.getRemoteAddress());
+				}
+			}
+			survivedSession.setSessionConnectionType(SessionConnectionType.S_CON_T_ACTIVE);
+			mqAddedSessions.add(survivedSession);
+			return;
+		}
+		
+		if ( !remote.equals(pathAddresses[0] ))
+			throw new IllegalStateException("Path from '" + remote + "' must have the address as index 0.");
+
+//		IOverlayManager overlayManager = _mq.getOverlayManager();
+//		boolean allNodesDeadInBetween = overlayManager.allNodesDeadInBetween(remote);
+		boolean allNodesDeadInBetween = areAllNodesDeadInBetween(connMan, remote);
+		
+		if ( ! allNodesDeadInBetween ){
+			survivedSession.setSessionConnectionType(SessionConnectionType.S_CON_T_INACTIVE);
+			return;
+		}
+		
+		else
+		{
+			survivedSession.setSessionConnectionType(SessionConnectionType.S_CON_T_ACTIVE);
+			mqAddedSessions.add(survivedSession);
+			_replacing_to_repalced.remove(survivedSession);
+		}
+		
+		// check to remove replacing relationships
+		for ( int i=1 ; i<pathAddresses.length ; i++ )
+		{
+			InetSocketAddress closerNeighbor = pathAddresses[i];
+			ISession closerSession = _allSessions.get(closerNeighbor);
+			if ( closerSession == null )
+				continue;
+			SessionConnectionType closerSessionConnectionType = closerSession.getSessionConnectionType();
+			if ( closerSessionConnectionType == SessionConnectionType.S_CON_T_BEINGREPLACED ||
+				 closerSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+			{
+				Set<ISession> replacings = getReplacingSessionsForBeingReplacedSession(closerSession);
+				if ( replacings.size() == 0 )
+				{
+					if ( closerSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED ){
+						ISession possibleLocal = _replacing_to_repalced.remove(closerSession);
+						if ( possibleLocal != null && ISessionLocal.class.isInstance(possibleLocal) )
+						{
+							Set<ISession> replacingSessions = getReplacingSessionsForBeingReplacedSession(possibleLocal);
+							if ( replacingSessions.size() == 0 )
+								mqRemovedSessions.add(possibleLocal);
+						}
+					}
+					_allSessions.remove(closerNeighbor);
+					mqRemovedSessions.add(closerSession);
+					closerSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+				}
+			}
+		}
+	}
+		
+	private boolean areAllNodesDeadInBetween(ConnectionManager connMan, InetSocketAddress remote) {
+		IOverlayManager overlayManager = connMan.getOverlayManager();
+		Path<OverlayNode> remotePath = overlayManager.getPathFrom(remote);
+		for ( int i=1 ; i<remotePath.getLength() ; i++ ){
+			InetSocketAddress closerAddress = remotePath.get(i).getAddress();
+			ISession closerSession = _allSessions.get(closerAddress);
+			if ( closerSession == null )
+				continue;
+			
+			SessionConnectionType closerSessionConnectionType = closerSession.getSessionConnectionType();
+			if ( closerSessionConnectionType == SessionConnectionType.S_CON_T_FAILED ||
+				 closerSessionConnectionType == SessionConnectionType.S_CON_T_DROPPED )
+				throw new IllegalStateException();
+			else
+				return false;
+		}
+		
+		return true;
+	}
+
+	private void checkFartherSessionsWhileRegister(ConnectionManager connMan, ISession survivedSession, Set<ISession> mqAddedSessions, Set<ISession> mqRemovedSessions){
+		if ( survivedSession.getSessionConnectionType() != SessionConnectionType.S_CON_T_ACTIVE )
+			return;
+			
+		InetSocketAddress remote = survivedSession.getRemoteAddress();
+		IOverlayManager overlayManager = connMan.getOverlayManager();
+		List<InetSocketAddress> fartherAddresses = overlayManager.getFartherNeighborsOrderedSet(remote);			
+		
+		Iterator<InetSocketAddress> fartherIt = fartherAddresses.iterator();
+		while ( fartherIt.hasNext() )
+		{
+			InetSocketAddress fartherAddress = fartherIt.next();
+			ISession fartherSession = null;
+
+			fartherSession = _allSessions.get(fartherAddress);
+			
+			if ( fartherSession == null )
+				continue;
+			
+			if ( fartherAddress.equals(survivedSession.getRemoteAddress()) )
+				continue;
+			
+			SessionConnectionType fartherSessionConnectionType = fartherSession.getSessionConnectionType();
+			switch( fartherSessionConnectionType ) {
+			case S_CON_T_ACTIVE:
+			{
+				mqRemovedSessions.add(fartherSession);
+				fartherSession.setSessionConnectionType(SessionConnectionType.S_CON_T_INACTIVE);
+				break;
+			}
+			
+			case S_CON_T_DROPPED:
+			{
+				throw new IllegalStateException("Cannot have a DROPPED session '" + fartherAddress + "' in the _allSession set.");
+			}
+			
+			case S_CON_T_INACTIVE:
+			{
+				break;
+			}
+			
+			case S_CON_T_REPLACING:
+			{
+				fartherSession.setSessionConnectionType(SessionConnectionType.S_CON_T_USELESS);
+				if ( _replacing_to_repalced.remove(fartherSession) == null ) //TODO: changed `!=' to `=='
+					throw new IllegalStateException("S_CON_T_REPLACING session '" + fartherAddress + "' is not associated with a BEING_REPLACED session in _replacing_to_replaced mapping.");
+				break;
+			}
+			
+			case S_CON_T_BEINGREPLACED:
+			{
+				fartherSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+				_allSessions.remove(fartherAddress);	
+				mqRemovedSessions.add(fartherSession);
+				break;
+			}
+			
+			case S_CON_T_REPLACING_BEINGREPLACED:
+			{
+				fartherSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+				_allSessions.remove(fartherAddress);	
+				mqRemovedSessions.add(fartherSession);
+				break;
+			}
+			
+			case S_CON_T_UNJOINED:
+			{
+				throw new IllegalStateException("An UNJOINED session '" + fartherAddress + "' cannot be farther of any session.");
+			}
+			}
+		}
+	}
+	
+	private void writeDownSummary(String str1, ISession session){
+		LoggerFactory.getLogger().info(this, "### " + str1 + session.getRemoteAddress());
+		
+		
+		String allSessionsStr = "";
+		Iterator<Entry<InetSocketAddress,ISession>> allSessionsIt = _allSessions.entrySet().iterator();
+		while ( allSessionsIt.hasNext() )
+			allSessionsStr += allSessionsIt.next().getKey();
+		LoggerFactory.getLogger().info(this, "### " + " all Sessions: [" + allSessionsStr + "]");
+
+		String replacingStr = "";
+		Iterator<Entry<ISession,ISession>> replacingIt = _replacing_to_repalced.entrySet().iterator();
+		while ( replacingIt.hasNext() ){
+			Entry<ISession, ISession> entry = replacingIt.next();	
+			replacingStr += (entry.getKey().getRemoteAddress() + "==>" + 
+							 entry.getValue().getRemoteAddress() );
+		}
+		LoggerFactory.getLogger().info(this, "### " + " Replaings: [" + replacingStr + "]");
+	}
+	
+	@Override
+	public void registerSession(ConnectionManager connManager, ISession newSession){
+		writeDownSummary("Before register: ", newSession);
+
+		synchronized (_allSessions){
+			InetSocketAddress remote = newSession.getRemoteAddress();
+			//TODO: exception below should be removed: although we require registerSession be called on only
+			//		pubSubEnabled(), sessionType may change by the time we get here, since we release lock on session.
+			if ( !newSession.isSessionTypePubSubEnabled() ){
+				LoggerFactory.getLogger().warn(this, "NewSession '" + remote + "' being registered is not pubSubEnabled");
+			}
+			
+//			IOverlayManager overlayManager = connManager.getMessageQueue().getOverlayManager();
+//			overlayManager.registerRemoteAsAlive(remote);
+			
+			boolean shouldContinue = connManager.performConnectionManagerTypeSpecificPreRegistration(newSession);
+			if ( !shouldContinue )
+				return;
+			
+			if ( registerSessionPrivately(connManager, newSession) == false )
+				return;
+
+			dumpAllSessions(connManager.getSessionsDumpFilename());
+			
+			connManager.performConnectionManagerTypeSpecificPostRegistration(newSession);
+		}
+		
+		writeDownSummary("After register: ", newSession);
+	}
+
+	private void failedPrivately(ConnectionManager connMan, ISession fSession, Set<ISession> fartherSessionsWithImmediateFailedConnections){
+		fSession.clearTempRepositoryData();
+		
+		InetSocketAddress remote = fSession.getRemoteAddress();
+		if ( remote!=null && !_allSessions.containsKey(remote) ){
+			LoggerFactory.getLogger().warn(this, "Failed session not present in _allSessions: " + fSession);
+			fSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+			return;
+		}
+		
+		SessionConnectionType fSessionConnectionType = fSession.getSessionConnectionType();
+		switch (fSessionConnectionType) {
+		case S_CON_T_DROPPED:
+		{
+			return;
+		}
+		
+		case S_CON_T_USELESS:
+		{
+			fSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED );
+			_allSessions.remove(remote);
+			return;
+		}
+		
+		case S_CON_T_UNJOINED:
+		{
+			fSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+			_allSessions.remove(remote);
+			return;
+		}
+		}
+		
+		ISession registeredFSession = null;
+		registeredFSession = _allSessions.get(remote);	
+		
+		if ( registeredFSession == null && fSessionConnectionType != SessionConnectionType.S_CON_T_UNKNOWN )
+			return;
+		
+		else if ( registeredFSession != fSession && fSessionConnectionType != SessionConnectionType.S_CON_T_UNKNOWN )
+			throw new IllegalStateException("FSession '" + remote + "' is '" + fSessionConnectionType + "' (not S_CON_T_UNKNOWN), but is not registered with allSessions.");
+
+		switch(fSessionConnectionType){
+		case S_CON_T_REPLACING_BEINGREPLACED:
+			throw new IllegalStateException("An S_CON_T_REPLACING_BEINGREPLACED session '" + remote + "' cannot fail again!!");
+		
+		case S_CON_T_BEINGREPLACED:
+			throw new IllegalStateException("An S_CON_T_BEINGREPLACED session '" + remote + "' cannot fail again!!");
+		
+		case S_CON_T_INACTIVE:
+		{
+			_allSessions.remove(remote);	
+			fSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+			return;
+		}
+				
+		case S_CON_T_UNJOINED:
+		{
+			Set<ISession> mqRemovedSessions = new HashSet<ISession>();
+			// fSession is in the mq and must be removed.
+			_allSessions.remove(remote);	
+			fSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+			mqRemovedSessions.add(fSession);
+			connMan.getMessageQueue().replaceSessions(mqRemovedSessions, null);
+			return;			
+		}
+
+		case S_CON_T_ACTIVE:
+		case S_CON_T_REPLACING: 
+		case S_CON_T_UNKNOWN:
+		{
+			Set<ISession> mqAddedSessions = new HashSet<ISession>();
+			Set<ISession> mqRemovedSessions = new HashSet<ISession>();
+			// Both S_CON_T_ACTIVE, S_CON_T_REPLACING are in the mq
+			// But we can only add them to mqRemoved, only if there is no farther neighbor.
+			IOverlayManager overlayManager = connMan.getOverlayManager();
+			InetSocketAddress[] neighborAddresses = overlayManager.getNeighbors(remote);
+			
+			if ( neighborAddresses.length <= 1 )
+			{
+				ISession replacingSessionSBeingReplacedSession = null;
+				// There's no farther neighbor, thus we can't do much.
+				if ( fSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING )
+				{
+					replacingSessionSBeingReplacedSession = _replacing_to_repalced.remove(fSession);
+				}
+
+				fSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+				_allSessions.remove(remote);	
+				mqRemovedSessions.add(fSession);
+				connMan.getMessageQueue().replaceSessions(mqRemovedSessions, null);
+				testBeingReplacedSession(connMan, replacingSessionSBeingReplacedSession);
+
+				return;
+			}
+			
+			if ( fSessionConnectionType == SessionConnectionType.S_CON_T_ACTIVE ||
+				 fSessionConnectionType == SessionConnectionType.S_CON_T_UNKNOWN )
+				fSession.setSessionConnectionType(SessionConnectionType.S_CON_T_BEINGREPLACED);
+			else if ( fSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING )
+				fSession.setSessionConnectionType(SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED );
+
+			for ( int i=1 ; i<neighborAddresses.length ; i++ )
+			{
+				InetSocketAddress fartherAddress = neighborAddresses[i];
+				ISession fartherSession = null;
+				fartherSession = _allSessions.get(fartherAddress);
+
+				if ( fartherSession != null )
+				{
+					SessionConnectionType fartherSessionConnectionType = fartherSession.getSessionConnectionType();
+					switch (fartherSessionConnectionType) {
+					case S_CON_T_ACTIVE:
+					{
+//						if ( fSessionConnectionType != SessionConnectionType.S_CON_T_UNKNOWN )
+//							throw new IllegalStateException("The failed session to '" + remote + "' was registered while a farther session to '" + fartherAddress + "' was S_CON_T_ACTIVE." );
+						break;
+					}
+					
+					case S_CON_T_USELESS:
+					{
+						fartherSession.setSessionConnectionType(SessionConnectionType.S_CON_T_REPLACING);
+						_replacing_to_repalced.put(fartherSession, fSession);
+						break;
+					}
+				
+					case S_CON_T_BEINGREPLACED:
+					{
+						// fartherSession must have been dropped.
+						throw new IllegalStateException("A fartherSession '" + fartherAddress + "' could not have been S_CON_T_BEINGREPLACED, while the closer session '" + remote + "' has failed.");
+					}
+					
+					case S_CON_T_DROPPED:
+					{
+						// fartherSession must not have been in _allSessions.
+						throw new IllegalStateException("An S_CON_T_DROPPED to '" + fartherAddress + "' must not be in allSessions.");
+					}
+					
+					case S_CON_T_INACTIVE:
+					{
+						fartherSession.setSessionConnectionType(SessionConnectionType.S_CON_T_ACTIVE);
+						mqAddedSessions.add(fartherSession);
+						break;
+					}
+					
+					case S_CON_T_REPLACING:
+					{
+						// fartherSession must have been S_CON_T_USELESS.
+						throw new IllegalStateException("If the farther session '" + fartherAddress + "' is S_CON_T_REPLACING, the failedSession '" + remote + "' could not have failed.");
+					}
+					
+					case S_CON_T_UNJOINED:
+					{
+						// There cannot be a fartherSession as S_CON_T_UNJOINED.
+						throw new IllegalStateException("S_CON_T_UNJOINED session to '" + fartherAddress + "' canont be the farther address of failed session '" + remote + "'.");
+					}
+					
+					case S_CON_T_UNKNOWN:
+					{
+						// No S_CON_T_UNKNOWN session is in _allSessions.
+						throw new IllegalStateException("There must be no S_CON_T_UNKNOWN session '" + fartherAddress +"' in allSessions.");
+					}
+					}
+				}
+				
+				else if ( fartherSession == null )
+				{
+					fartherSession = connMan.getDefaultOutgoingSession(fartherAddress);
+					fartherSession.setSessionConnectionType(SessionConnectionType.S_CON_T_REPLACING);
+					_allSessions.put(fartherAddress, fartherSession);	
+					_replacing_to_repalced.put(fartherSession, fSession);
+					
+					LoggerFactory.getLogger().info(this, "Connecting to farther node: " + fartherAddress );
+					IConInfoNonListening newConInfoNL = connMan.getNIOBinding().makeOutgoingConnection(fartherSession, connMan, connMan, connMan, fartherAddress);
+					if ( newConInfoNL == null ){
+						fartherSessionsWithImmediateFailedConnections.add(fartherSession);
+					}
+//					_nioBinding.renewConnection(fartherSession);//, this, this, this, fartherAddress);
+				}
+				
+			}
+			//TODO: shouldn't it be <addresses.length-1 ??
+			Set<ISession> killSessions = new HashSet<ISession>();
+			Path<OverlayNode> pathFromFSession = overlayManager.getPathFrom(remote);
+			InetSocketAddress[] addresses = pathFromFSession.getAddresses();
+			for ( int i=0 ; i<addresses.length ; i++ )
+			{
+				InetSocketAddress closerNeighbor = addresses[i];
+				ISession closerSession = null;
+				closerSession = _allSessions.get(closerNeighbor);
+				if ( closerSession == null )
+					break;
+				SessionConnectionType closerSessionConnectionType = closerSession.getSessionConnectionType();
+				if ( closerSessionConnectionType == SessionConnectionType.S_CON_T_BEINGREPLACED ){
+					Set<ISession> replacingSessions = getReplacingSessionsForBeingReplacedSession(closerSession);
+					if ( replacingSessions.size() == 0 )
+					{
+						_replacing_to_repalced.remove(closerSession);
+						killSessions.add(closerSession);
+						break;
+					}
+					else
+						break;
+				}
+				else if ( closerSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+				{
+					Set<ISession> replacingSessions = getReplacingSessionsForBeingReplacedSession(closerSession);
+					if ( replacingSessions.size() == 0 )
+					{
+						_replacing_to_repalced.remove(closerSession);
+						killSessions.add(closerSession);
+					}
+//					else
+//						break;
+				}
+			}
+			
+			Iterator<ISession> killIt = killSessions.iterator();
+			while ( killIt.hasNext() )
+			{
+				ISession killSession = killIt.next();
+				mqRemovedSessions.add(killSession);
+				killSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+				_replacing_to_repalced.remove(killSession);
+				_allSessions.remove(killSession.getRemoteAddress());
+			}
+			
+			connMan.getMessageQueue().replaceSessions(mqRemovedSessions, mqAddedSessions);
+			return;
+		}
+		}
+	}
+	
+	@Override
+	public LoggingSource getLogSource() {
+		return LoggingSource.LOG_SRC_SESSION_REGISTER_MANAGER;
+	}
+
+	@Override
+	public void failed(ConnectionManager connManager, ISession fSession) {
+		writeDownSummary("Before Failed: ", fSession);
+		
+		Set<ISession> fartherSessionsWithImmediateFailedConnections = new HashSet<ISession>();
+		
+		synchronized (_allSessions){
+			InetSocketAddress fRemote = fSession.getRemoteAddress();
+			if ( fRemote == null )
+				return;
+			
+			SessionConnectionType fSessionConnectionType = fSession.getSessionConnectionType();
+			
+			if ( fSessionConnectionType == SessionConnectionType.S_CON_T_DROPPED )
+				return;
+			
+//			IOverlayManager overlayManager = _mq.getOverlayManager();
+//			overlayManager.registerRemoteAsDead(fRemote);
+			
+			failedPrivately(connManager, fSession, fartherSessionsWithImmediateFailedConnections);
+			dumpAllSessions(connManager.getSessionsDumpFilename());
+			
+			connManager.performConnectionManagerTypeSpecificPostFailed(fSession);
+		}
+		
+		Iterator<ISession> fartherSessionsWithImmediateFailedConnectionsIt = fartherSessionsWithImmediateFailedConnections.iterator();
+		while (fartherSessionsWithImmediateFailedConnectionsIt.hasNext()){
+			ISession fartherSessionWithImmediateFailedConnection = fartherSessionsWithImmediateFailedConnectionsIt.next();
+			connManager.conInfoUpdated(fartherSessionWithImmediateFailedConnection.getConInfoNL());
+		}
+		
+		writeDownSummary("After Failed: ", fSession);		
+	}
+
+	public Set<ISession> getReplacingSessionsFromAllSessions(ISession replacedSession){
+		if ( replacedSession.getSessionConnectionType() != SessionConnectionType.S_CON_T_BEINGREPLACED )
+			throw new IllegalArgumentException("ReplacedSession '" + replacedSession.getRemoteAddress() + "' is not S_CON_T_BEINGREPLACED.");
+		
+		Set<ISession> allReplacing = new HashSet<ISession>();
+		Set<Entry<ISession, ISession>> set = _replacing_to_repalced.entrySet();
+		Iterator<Entry<ISession, ISession>> it = set.iterator();
+		while ( it.hasNext() )
+		{
+			Entry<ISession, ISession> entry = it.next();
+			ISession replaced = entry.getValue();
+			ISession replacing = entry.getKey();
+			
+			if ( replacing.getSessionConnectionType() != SessionConnectionType.S_CON_T_REPLACING )
+				throw new IllegalStateException("The registered replacing session '" + replacing.getRemoteAddress() + "' is not S_CON_T_REPLACING.");
+			
+			if ( replaced.equals(replacedSession) )
+				allReplacing.add(replacing);
+		}
+		return allReplacing;
+	}
+	
+	private Set<ISession> getReplacingSessionsForBeingReplacedSession(ISession beingReplacedSession){
+		SessionConnectionType beingReplacedSessionConnectionType = beingReplacedSession.getSessionConnectionType();
+		if ( beingReplacedSessionConnectionType != SessionConnectionType.S_CON_T_BEINGREPLACED &&
+			 beingReplacedSessionConnectionType != SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+			throw new IllegalStateException("Replacing session '" + beingReplacedSession.getRemoteAddress() + "' is not S_CON_T_REPLACING; it is " + beingReplacedSessionConnectionType);
+		
+		Set<ISession> replacingSessions = new HashSet<ISession>();
+		
+		Set<Entry<ISession, ISession>> set = _replacing_to_repalced.entrySet();
+		Iterator<Entry<ISession, ISession>> it = set.iterator();
+		while ( it.hasNext() )
+		{
+			Entry<ISession, ISession> entry = it.next();
+			ISession replacingSession = entry.getKey();
+			ISession replacedSession = entry.getValue();
+			
+			if ( replacedSession == beingReplacedSession )
+			{
+				if ( replacingSession.getSessionConnectionType() != SessionConnectionType.S_CON_T_REPLACING && 
+					 replacingSession.getSessionConnectionType() != SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+					throw new IllegalStateException("Beingreplaced session's '" + beingReplacedSession + "' replacing session '" + replacingSession + "' is not S_CON_T_REPLACING. It is " + replacingSession.getSessionConnectionType() + ".");
+				
+				replacingSessions.add(replacingSession);
+			}
+		}
+		
+		return replacingSessions;
+	}
+	
+	protected Set<ISession> getSessionsOfSessionConnectionType(SessionConnectionType sessionConnectionType){
+		Set<ISession> sessions = new HashSet<ISession>();
+		
+		synchronized (_allSessions) {
+			Set<Entry<InetSocketAddress, ISession>> set = _allSessions.entrySet();
+			Iterator<Entry<InetSocketAddress, ISession>> it = set.iterator();
+			while ( it.hasNext() ){
+				Entry<InetSocketAddress, ISession> entry = it.next();
+				ISession session = entry.getValue();
+				if ( session.getSessionConnectionType() == sessionConnectionType )
+					sessions.add(session);
+			}
+		}
+		
+		return sessions;
+	}
+	
+
+	
+//	private Set<ISession> getAllBeingReplacedSessions(){
+//		Set<ISession> beingReplacedSessions = new HashSet<ISession>();
+//		
+//		Set<Entry<InetSocketAddress, ISession>> set = _allSessions.entrySet();
+//		Iterator<Entry<InetSocketAddress, ISession>> it = set.iterator();
+//		while ( it.hasNext() )
+//		{
+//			Entry<InetSocketAddress, ISession> entry = it.next();
+//			InetSocketAddress remote = entry.getKey();
+//			ISession session = entry.getValue();
+//			if ( session.getSessionConnectionType() == SessionConnectionType.S_CON_T_BEINGREPLACED )
+//				beingReplacedSessions.add(session);
+//		}
+//		
+//		return beingReplacedSessions;
+//	}
+	
+//	private void testAllBeingReplaced(){
+//		// First get all being replaced sessions
+//		Set<ISession> allBeingReplacedSessions = getAllBeingReplacedSessions();
+//		
+//		Iterator<ISession> it = allBeingReplacedSessions.iterator();
+//		while(it.hasNext())
+//		{
+//			ISession beingReplaceSession = it.next();
+//			testBeingReplacedSession(beingReplaceSession);
+//		}
+//	}
+	
+	private void testBeingReplacedSession(ConnectionManager connMan, ISession beingReplacedSession){
+		if ( beingReplacedSession == null )
+			return;
+		
+		ISession replacingABeingReplacedSessionAsWell = null;
+		
+		SessionConnectionType sessionConnectionType = beingReplacedSession.getSessionConnectionType();
+		if ( sessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+			replacingABeingReplacedSessionAsWell = _replacing_to_repalced.get(beingReplacedSession);
+		else if ( sessionConnectionType != SessionConnectionType.S_CON_T_BEINGREPLACED )
+			throw new IllegalStateException("beingReplacedSession is neither BEINGREPLACED/nor REPLACING_BEINGREPLACED, it is '" + sessionConnectionType );
+	
+		Set<ISession> replacingSessions = getReplacingSessionsForBeingReplacedSession(beingReplacedSession);
+		
+//		synchronized (_allSessions) 
+		{
+			if ( replacingSessions.size() == 0 && _allSessions.containsKey(beingReplacedSession.getRemoteAddress())){
+				ISession registeredbeingReplaced = _allSessions.remove(beingReplacedSession.getRemoteAddress());
+				if ( registeredbeingReplaced != beingReplacedSession )
+					throw new IllegalStateException("BeingregisteredSession '" + beingReplacedSession.getRemoteAddress() + "' does not match the one in allSessions.");
+				
+				Set<ISession> mqRemovedSet = new HashSet<ISession>();
+				mqRemovedSet.add(beingReplacedSession);
+				_allSessions.remove(beingReplacedSession.getRemoteAddress());
+				beingReplacedSession.setSessionConnectionType(SessionConnectionType.S_CON_T_FAILED);
+				connMan.getMessageQueue().replaceSessions(mqRemovedSet, null);
+				
+				_replacing_to_repalced.remove(beingReplacedSession);
+				testBeingReplacedSession(connMan, replacingABeingReplacedSessionAsWell);
+			}
+		}
+	}
+	
+	@Override
+	public final void registerUnjoinedSessionAsJoined(ConnectionManager connMan, InetSocketAddress remote){
+		synchronized (_allSessions){
+			
+			ISession unjoinedSession = null;
+			unjoinedSession = _allSessions.get(remote);
+			if ( unjoinedSession == null || unjoinedSession.getSessionConnectionType() != SessionConnectionType.S_CON_T_UNJOINED )
+				return;
+			
+			{
+				IMessageQueue mq = connMan.getMessageQueue();
+				IOverlayManager overlayManager = mq.getOverlayManager();
+//				overlayManager.registerRemoteAsAlive(remote);
+				
+				Path<OverlayNode> p = overlayManager.getPathFrom(remote);
+				
+				if ( p == null )
+					throw new IllegalStateException("In order to register '" + remote + "' as a non-`S_CON_T_UNJOINED' session, it must be in the overlaymanager.");
+				
+				if ( p.getLength() == 1 )
+				{
+					// Register as ACTIVE
+					// No need to do a replace: since UNJOINED sessions are already registered with the MQ.
+					unjoinedSession.setSessionConnectionType(SessionConnectionType.S_CON_T_ACTIVE);
+					dumpAllSessions(connMan.getSessionsDumpFilename());
+					mq.replaceSessions(null, null);
+//					_mq.proceed(remote);
+					mq.proceedAll();
+				}
+				else
+				{
+					throw new IllegalStateException("An S_CON_T_UNJOINED to '" + remote + "' cannot be re-registered as S_CON_T_INACTIVE.");
+				}
+			}
+		}
+	}
+	// Replaces all references to two ISession instances corresponding to the same remote
+	// So that _allSessions, _replacing_to_replaced do not have any reference to oldSession.
+	protected void replaceOldSessionWithNewSession(ISession oldSession, ISession newSession, Set<ISession> mqAddedSessions, Set<ISession> mqRemovedSessions){
+		LoggerFactory.getLogger().debug(this, "Replacing old session: " + oldSession + " with new session: " + newSession);
+		InetSocketAddress oldRemote = oldSession.getRemoteAddress();
+		InetSocketAddress newRemote = newSession.getRemoteAddress();
+		
+		if (!newRemote.equals(oldRemote) )
+			throw new IllegalArgumentException("Old remote and new remote do not match.");
+		
+		InetSocketAddress remote = oldRemote;
+		SessionConnectionType oldSessionConnectionType = oldSession.getSessionConnectionType();
+		
+		if ( oldSessionConnectionType == SessionConnectionType.S_CON_T_BEINGREPLACED ||
+			 oldSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+		{
+			Set<ISession> replacingSessions = getReplacingSessionsForBeingReplacedSession(oldSession);
+			Iterator<ISession> it = replacingSessions.iterator();
+			while ( it.hasNext() ){
+				ISession replacingSession = it.next();
+				ISession replacedSession = _replacing_to_repalced.remove(replacingSession);
+				if ( replacedSession != oldSession )
+					throw new IllegalStateException("BeingReplaced Session does not match oldSession '" + oldSession.getRemoteAddress() + "'.");
+				_replacing_to_repalced.put(replacingSession, newSession);
+			}
+		}
+		
+		if ( oldSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING ||
+			 oldSessionConnectionType == SessionConnectionType.S_CON_T_REPLACING_BEINGREPLACED )
+		{
+			ISession replacedSession = _replacing_to_repalced.remove(oldSession);
+			_replacing_to_repalced.put(newSession, replacedSession);
+		}
+		
+		ISession prevRegisteredSession = _allSessions.remove(remote);
+		if ( prevRegisteredSession != oldSession )
+			throw new IllegalStateException("While replacing, did not found oldSession '" + remote + "' in the allSession set.");
+		
+		newSession.setSessionConnectionType(oldSessionConnectionType);
+		_allSessions.put(remote, newSession);
+		
+		if ( oldSession.isSessionTypePubSubEnabled() )
+		{
+			mqAddedSessions.add(newSession);
+			mqRemovedSessions.remove(oldSession);
+		}
+	}
+	
+	@Override
+	public boolean upgradeUnjoinedSessionToActive(
+			ConnectionManager connManager,
+			InetSocketAddress completedJoinAddress) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	protected final static boolean isOutgoingValid(InetSocketAddress A, InetSocketAddress B){
+		if ( A.equals(B) )
+			throw new IllegalStateException("ConnectionManager::isOutgoingValid(.) - ERROR, cannot connect to oneself.");
+		byte ipLocal[] = A.getAddress().getAddress();
+		byte ipRemote[] = B.getAddress().getAddress();
+		
+		if ( (((int)ipLocal[0])&0xFF) < (((int)ipRemote[0])&0xFF) )
+			return true;
+		if ( (((int)ipLocal[0])&0xFF) > (((int)ipRemote[0])&0xFF) )
+			return false;
+
+		if ( (((int)ipLocal[1])&0xFF) < (((int)ipRemote[1])&0xFF) )
+			return true;
+		if ( (((int)ipLocal[1])&0xFF) > (((int)ipRemote[1])&0xFF) )
+			return false;
+
+		if ( (((int)ipLocal[2])&0xFF) < (((int)ipRemote[2])&0xFF) )
+			return true;
+		if ( (((int)ipLocal[2])&0xFF) > (((int)ipRemote[2])&0xFF) )
+			return false;
+
+		if ( (((int)ipLocal[3])&0xFF) < (((int)ipRemote[3])&0xFF) )
+			return true;
+		if ( (((int)ipLocal[3])&0xFF) > (((int)ipRemote[3])&0xFF) )
+			return false;
+
+		int localPort = A.getPort();
+		int remotePort = B.getPort();
+		
+		if ( localPort < remotePort )
+			return true;
+		else 
+			return false;
+	}
+}

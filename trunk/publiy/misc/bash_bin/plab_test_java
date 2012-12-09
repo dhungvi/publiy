@@ -1,0 +1,56 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then 
+	echo "Working dir is missing ($0)";
+	exit -1; fi
+workingdir=$1;
+
+sshprivatekey="$HOME/.ssh/pl.id_rsa"; 
+basejavatarsize="`ls -s $lrepo/java32.tar.gz | awk '{printf \$1\" \"}'`";
+PL_USER="$ft";
+PL_HOME="/home/utoronto_jacobsen_ft";
+PL_JAVA_TAR="$PL_HOME/localrepo/java32.tar.gz";
+
+nodesIPs=`ssh reza@master.msrg.utoronto.ca "source ~/.bash_profile; host_lookup_all \`awk '{printf \$2" "}' $workingdir/nodes\`" | awk 'BEGIN{RS=" ";FS=":"}{printf $2" "}'`;
+
+# echo $nodesIPs > $workingdir/nodes.ips;
+
+counter="0";
+SSH_TIMEOUT=20;
+MAX_CONCURRENT="10";
+
+for remote in $nodesIPs; do 
+    (
+        remotejavatarsize=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $PL_USER@$remote "if [ -f $PL_JAVA_TAR ]; then echo \"\`ls -s $PL_JAVA_TAR\`\"; else echo \"0\"; mkdir -p \`dirname $PL_JAVA_TAR\`; fi"` 2>/dev/null;
+        if [ -z "$remotejavatarsize" ]; then remotejavatarsize="-1"; fi
+	echo "$remote $remotejavatarsize";
+	#| awk "{if(\$2!=$basejavatarsize) printf \$1\" \";}";
+    )&
+    p="$!";
+    (
+	remoteaddress="$remote";
+	finished="";
+	sleep 1;
+	for i in `seq 1 10`; do
+		psoutput=`ps -s -p $p | wc -l`;
+		if [ "$psoutput" -lt 2 ]; then
+			finished="1"; break; 
+		else sleep 2; fi
+	done
+	if [ -z "$finished" ]; then
+		echo "$remoteaddress -1";
+		kill -9 $p 2>/dev/null;fi;
+    ) &
+    pids="$pids $!";
+    counter="`expr 1 + $counter`";
+
+    if [ $counter -eq $MAX_CONCURRENT ]; then
+	# echo "WAIT $pids";
+	wait $pids;
+	counter="0";
+	pids="";
+    fi
+done
+
+wait $pids;
+

@@ -1,0 +1,30 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Working dir is missing";
+    exit -1; fi
+workingdir="`cygpath -a $1`";
+
+tmp=`mktemp -d`;
+
+if [ ! -d $tmp ]; then
+    mkdir $tmp; fi
+
+for alltarfile in `ls $workingdir/*-all.tar.gz`; do
+    if [ `expr match "\`basename $alltarfile\`" "clean-.*"` -ne 0 ]; then
+        red "SKIPPING $alltarfile";
+        continue; fi
+
+    blue $alltarfile;
+    tar -zxf $alltarfile -C $tmp;
+    rm -f $tmp/*.subw;
+    cleanalltarfile="$workingdir/clean-`basename $alltarfile`";
+    (
+       cd $tmp;
+       tar -zcf $cleanalltarfile *;
+    )
+    rm -rf $tmp/*;
+    mv $cleanalltarfile $alltarfile;
+done
+
+rm -rf $tmp;

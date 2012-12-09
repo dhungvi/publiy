@@ -1,0 +1,2 @@
+files=$1"deploy*";
+for x in `ls $files`; do cat $x > /tmp/tmp_correct_permissions`; rm $x; cat /tmp_correct_permissions > $x; done

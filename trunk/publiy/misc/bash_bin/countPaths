@@ -1,0 +1,42 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	red "Working directory is missing ($0)";
+	exit -1;
+fi
+workingdir="$1";
+workingdirWin="`cygpath -w $workingdir/`";
+
+controllerAddress="`get_local_ip $workingdir`";
+strategy="$brokerStrategy";
+auto="$guiAutomation";
+tickscaler="3";
+
+outputdir="$workingdir/plots";
+if [ ! -d "$outputdir" ]; then
+    mkdir -p $outputdir; fi
+
+if [ -r "$workingdir/.fanout" ]; then
+    fanout=`cat $workingdir/.fanout`;
+else
+    fanout="12"; fi
+
+if [ -r "$workingdir/.cand" ]; then
+    cand=`cat $workingdir/.cand`;
+else
+    cand="4"; fi
+
+sampling_times="900 1000 1100";
+
+CLASS_NAME="alg.pathcount.PathCount";
+# CLASS_NAME="alg.pathcount.GOverlayManagerWithSoftLinks";
+
+#cp $workingdir/*.properties $workingdir/temp/;
+extract_sessions $workingdir/ $workingdir/*.xtop
+for sampling_time in $sampling_times; do 
+    yellow "@ $sampling_time  -  $workingdir";
+    outputfile="$outputdir/pathscount_t${sampling_time}";
+    java -cp "$sjar;$gejar;$layoutjar" -Dgui.main.MainFrame.workingDir=$workingdirWin $CLASS_NAME $sampling_time > $outputfile;
+    awk '{if(lines[$3]=="")lines[$3]=$0;else lines[$3]=lines[$3]"\n"$0}END{l=asorti(lines,dest);for(i=1;i<=l;i++)print lines[dest[i]];}' ${outputfile} > ${outputfile}.proc
+done
+

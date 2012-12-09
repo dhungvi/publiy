@@ -1,0 +1,33 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    red "No remote specified";
+    exit -1; fi
+remote="$1";
+
+if [ ! -d "$2" ]; then
+    red "No destination dir $2 specified";
+    exit -1; fi
+destdir="$2";
+
+localrepo="/home/Reza/localrepo";
+sshprivatekey="$localrepo/../.ssh/id_rsa";
+sshpubkey="$localrepo/../.ssh/id_rsa.pub";
+
+CL_USER="reza";
+CL_HOME="/home/master/$CL_USER";
+CL_SDIR="$CL_HOME/System";
+CL_OUTPUT="\`get_outputs_dir\`";
+CL_OUTPUT_BCS="$CL_OUTPUT/BC-*";
+CL_ALL_TAR_DIR="$CL_HOME";
+CL_ALL_TAR="all.tar.gz";
+CL_MASTER="10.0.0.1";
+
+blue "Tarring on $remote";
+
+ssh -i $sshprivatekey $CL_USER@$remote "rm -f $CL_ALL_TAR_DIR/$remote-$CL_ALL_TAR 2>/dev/null; cd \$OUTPUTS_DIR; rm -f *.subw; tar -zcf $CL_ALL_TAR_DIR/$remote-$CL_ALL_TAR $remote\"_\"* BC-*-\$HOSTNAME 2>/dev/null;"
+
+
+blue "Retreiving from $remote";
+
+scp -i $sshprivatekey $CL_USER@$remote:$CL_ALL_TAR_DIR/$remote-$CL_ALL_TAR $destdir/$remote-$CL_ALL_TAR;

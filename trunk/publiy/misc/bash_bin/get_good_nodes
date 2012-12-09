@@ -1,0 +1,71 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	echo "Workind directory is missing!";
+	exit -1; fi
+workingdir="$1";
+
+sortedfilename="$workingdir/nodes.sorted";
+if [ ! -f "$sortedfilename" ]; then
+	if [ ! -f "$workingdir/nodes" ]; then
+		echo "Working dir has no nodes file!";
+		exit -1; fi
+	
+	test_sort_all_nodes $workingdir/nodes > $sortedfilename;
+else
+	echo "Reusing the sorted files";
+fi
+
+if [ ! -z "$2" ]; then
+	maxdelay=$2;
+else
+	maxdelay=10;
+fi
+
+if [ ! -z "$3" ]; then
+	maxload1=$3;
+else
+	maxload1=100;
+fi
+
+if [ ! -z "$4" ]; then
+	maxload5=$4;
+else
+	maxload5=100;
+fi
+
+if [ ! -z "$5" ]; then
+	maxload15=$5;
+else
+	maxload15=100;
+fi
+
+# echo "MaxDelay: $maxdelay, MaxLoad1=$maxload1, MaxLoad5=$maxload5, MaxLoad15=$maxload15";
+
+cat $sortedfilename |
+	 awk "
+	  	BEGIN{
+			FS=\"[ |,]\";
+			maxdelay=$maxdelay; maxload1=$maxload1; maxload5=$maxload5; maxload15=$maxload15;
+#		  	print \"#\", maxdelay, maxload1, maxload5, maxload15;
+		}
+		/SUCCESS/{
+		delayIndex=2;
+		load1Index=NF-3;
+		load5Index=NF-2;
+		load15Index=NF-1;
+#		print \$delayIndex, \$load1Index, \$load5Index, \$load15Index;
+#		print \$delayIndex\"\\t\"\$load1Index\"\\t\"\$load5Index\"\\t\"\$load15Index;
+		if (\$delayIndex < maxdelay) {
+		   if (\$load1Index < maxload1) {
+		    if (\$load5Index < maxload5) {
+		      if (\$load15Index < maxload15) {
+			  print \$0;
+		      }
+		    }
+		  }
+		}
+		}
+		END{}
+	 " > "$workingdir/nodes.good";
+

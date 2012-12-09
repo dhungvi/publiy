@@ -1,0 +1,3 @@
+#! /bin/awk -f
+
+{tot8+=$8; tot10+=$10; tot12+=$12; tot14+=$14; tot16+=$16; tot18+=$18;}END{print "P: "tot8"->"tot10"\t S: "tot12"->"tot14"\tC: "tot16"->"tot18;}

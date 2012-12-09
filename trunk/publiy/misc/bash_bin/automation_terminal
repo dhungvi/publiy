@@ -1,0 +1,6 @@
+while read line; do
+	pink $line;
+	if [ "$line" = "exit" ]; then
+		exit 0; fi
+done
+

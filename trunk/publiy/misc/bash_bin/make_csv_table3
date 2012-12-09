@@ -1,0 +1,51 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Working dir $1 is not accessible";
+    exit -1; fi
+workingdir="$1";
+
+tablefile="$workingdir/`basename $workingdir`_table.csv";
+
+echo "#PUBLISHED, DELIV, MULT, PDELAY, SDELAY, TICK, DELTA, STRATEGY, WORKLD, FANOUT, CAND, BW_IN, BW_OUT, EXECNO, DIRNAME" > $tablefile;
+
+for DT in `ls -d $workingdir/DT*/`; do
+    params=`basename $DT | awk '{printf gensub(/DT{zipf-MULT([[:digit:]]*).0-SKW1.0-PG60-PC10-SG60}-DELAY{([[:digit:]]*)-([[:digit:]]*)}-TICK([[:digit:]]*)-d([[:digit:]]*)-sSTR([[:digit:]]*)-W([[:digit:]]*)-MP-FOUT([[:digit:]]*)-CAND([[:digit:]]*)-BW_METRIC_INOUT_BYTES{([[:digit:]]*)-([[:digit:]]*)}__([[:digit:]]*)/, "\\\\1, \\\\2, \\\\3, \\\\4, \\\\5, \\\\6, \\\\7, \\\\8, \\\\9", 1)}'`;
+    params=$params", "`basename $DT | awk '{printf gensub(/DT.*BW_METRIC_INOUT_BYTES{([[:digit:]]*)-([[:digit:]]*)}__([[:digit:]]*)/, "\\\\1, \\\\2, \\\\3, \\\\0", 1)}'`;
+
+    i=0;
+    params_array=(${params[*]});
+    mult=${params_array[$((i++))]}
+    pdelay=${params_array[$((i++))]}
+    sdelay=${params_array[$((i++))]}
+    tick=${params_array[$((i++))]}
+    delta=${params_array[$((i++))]}
+    str=${params_array[$((i++))]}
+    workload=${params_array[$((i++))]}
+    fanout=${params_array[$((i++))]}
+    cand=${params_array[$((i++))]}
+    bwin=${params_array[$((i++))]}
+    bwout=${params_array[$((i++))]}
+    exec_no=${params_array[$((i++))]}
+    dname=${params_array[$((i++))]}
+
+    deliv=`awk '/==>/{printf $2", "$3}' $DT/.countall`;
+#    echo "dirname: $dname";
+#    echo "mult: $mult"
+#    echo "pdelay: $pdelay"
+#    echo "sdelay: $sdelay"
+#    echo "tick: $tick"
+#    echo "delta: $delta"
+#    echo "str: $str"
+#    echo "workload: $workload"
+#    echo "fanout: $fanout"
+#    echo "cand: $cand"
+#    echo "bwin: $bwin"
+#    echo "bwout: $bwout"
+#    echo "exec_no: $exec_no"
+
+     echo "$deliv, $mult $pdelay $sdelay $tick $delta $str $workload $fanout $cand $bwin $bwout $exec_no $dname";
+done >> $tablefile;
+
+
+

@@ -1,0 +1,47 @@
+#!/bin/bash
+
+source common.sh
+
+if [ -z "$1" ]; then 
+    red "No time is specified";
+    exit -1; fi
+triggertimereadable="$1";
+
+if [ -z "$2" ]; then
+    red "No script specified";
+    exit -1; fi
+shift;
+script="$*";
+
+
+##################
+# SETUP
+
+triggertime=( $(echo $triggertimereadable | awk '{printf gensub(/([[:digit:]]*):([[:digit:]]*)/, "\\1 \\2", 1)}') );
+
+triggerhr=${triggertime[0]};
+triggermin=${triggertime[1]};
+triggertime=`expr 60 \* $triggerhr + $triggermin`;
+
+(
+    while :; do
+        currhr=`date +%H`;
+        currmin=`date +%M`;
+
+        currtime=`expr 60 \* $currhr + $currmin`;
+        if [ $currtime -eq $triggertime ]; then
+            result="$($script)" &
+            green "Triggered. Executing $script (pid=$!)";
+            exit 0;
+        elif [ $currtime -gt $triggertime ]; then
+            red "Too late. Trigger time is passed :(";
+            exit -1;
+        else
+            sleep 1;
+            pink -en ".";
+        fi
+    done
+) &
+
+just_wait $!;
+
