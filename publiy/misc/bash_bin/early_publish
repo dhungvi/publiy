@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    red "Delay is missing";
+    exit -1; fi
+delay="$1";
+shift
+
+if [ ! -f "$2" ]; then
+    red "Property file is missing";
+    exit -1; fi
+propertyfiles="$*";
+
+SPACE="`awk 'BEGIN{for(i=1;i<='$delay';i++)printf \" \"}'`";
+echo ">$SPACE<";
+
+blue "Delaying $delay publish on $propertyfiles";
+
+sed -i -e "s/$SPACE\\\\u25BA/\\\\u25BA/" $propertyfiles;

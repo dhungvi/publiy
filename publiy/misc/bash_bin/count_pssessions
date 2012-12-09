@@ -1,0 +1,17 @@
+#!/bin/bash
+
+function count_pss() {
+    local file="$1";
+    blue "$file: `grep PSSession $file | awk 'BEGIN{FS="PSSession"} {printf NF" ";}'`";
+}
+
+if [ -z "$1" ]; then
+   for xtop_file in `ls $workingdir/*.xtop`; do
+       count_pss $xtop_file;
+   done
+else
+    for file in $*; do
+        count_pss $file;
+    done
+fi
+

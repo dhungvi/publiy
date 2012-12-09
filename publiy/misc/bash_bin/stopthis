@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    workingdir=`pwd`;
+elif [ -d "$1" ]; then
+    workingdir="$1";
+else
+    red "No such directory: $1";
+    exit -1;
+fi;
+
+echo "STOP" > $workingdir/.stop;

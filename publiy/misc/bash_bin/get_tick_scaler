@@ -1,0 +1,1 @@
+awk '/tickscaler=/{print gensub(/tickscaler=([[:digit:]]*).*/,"\\1",1)}' $*

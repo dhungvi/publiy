@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ $# == 0 ]; then
+	deployFile=deploy-127.0.0.1.sh;
+	auto=false;
+elif [ $# == 1 ]; then
+	deployFile=$1;
+	auto=false;
+elif [ $# == 2 ]; then
+	deployFile=$1;
+	auto=$2;
+fi
+
+echo "Using strategy::: $brokerStrategy";
+
+if [ -f $deployFile ]; then
+	killall java;
+	output=$(./$deployFile $auto);
+	echo $output;
+else
+	echo "File: $deployFile does not exist!";
+	exit -1;
+fi
+

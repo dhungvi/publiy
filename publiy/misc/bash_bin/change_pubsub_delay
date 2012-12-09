@@ -1,0 +1,7 @@
+delay="$1";
+shift;
+files="$*";
+
+green -en "DELAY: $delay"; pink $files;
+
+sed -i -e "s/Delay=.*/Delay=$delay/" $files

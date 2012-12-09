@@ -1,0 +1,23 @@
+#! /bin/bash
+
+opipe="`dirname $0`/.autumatedpanda.outpipe";
+if [ ! -p $opipe ]; then
+	echo "A needed pipe is missing: " $opipe;
+	exit -1;
+fi
+
+commandStringRunPanda="source ~/.bash_profile; runpanda top.top;"
+
+if [ "$1" = "kill" ]; then
+	echo "Killing ... ";
+	generatepandakillcommands > $opipe&
+else
+	echo "Running panda ... ";
+	generatepandacommands > $opipe&
+fi
+
+cat $opipe | ssh -i ~/.ssh/id_rsa reza@master.msrg.utoronto.ca $commandStringRunPanda; 
+
+wait $pid;
+
+

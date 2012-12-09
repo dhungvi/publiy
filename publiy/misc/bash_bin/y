@@ -1,0 +1,4 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then count=10000; else count=$1; fi
+for i in `seq 1 $count`; do echo "yes"; done

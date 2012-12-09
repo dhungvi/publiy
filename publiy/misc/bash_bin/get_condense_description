@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ $# != 1 ]; then
+	echo "Filename is missing!"
+	exit -1;
+fi
+
+awk '/CONDENSE_DESCRIPTION/ {print $2}' $1

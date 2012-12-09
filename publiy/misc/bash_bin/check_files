@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "No working dir specified";
+    exit -1; fi
+workingdir="$1";
+
+shift;
+for file in $*; do
+    if [ ! -r "$workingdir/$file" ]; then
+        red "File is missing: $workingdir/$file";
+        ret=-1;
+    fi
+done
+
+if [ "$ret" = "-1" ]; then
+    exit -1;
+else
+    exit 0;
+fi

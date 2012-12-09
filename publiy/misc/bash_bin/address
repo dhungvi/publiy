@@ -1,0 +1,1 @@
+grep "NodeAddress" $1.properties

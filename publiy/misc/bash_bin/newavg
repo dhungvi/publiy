@@ -1,0 +1,43 @@
+#!/bin/awk -f
+
+#valarray[valindex, w] = val
+#indexarray[valindex] = w
+#totarray[valindex,w]
+
+
+BEGIN{
+	line=0;
+	windowsize = 4;
+	valarray[0] = 0;
+	indxarray[0] = 0;
+	totarray[0] = 0;
+}
+function avg(valindex, newval){
+	if ( index(newval, ":") ){
+		split(newval, a, ":");
+		newval = a[1]*60 + a[2];
+
+		if ( indexarray[valindex]==0 ){
+			totarray[valindex] = newval;
+			indexarray[valindex] = 1;
+			return 0;
+		}
+		else
+			newval -= totarray[valindex];
+
+		return newval;
+	}
+	w = (indexarray[valindex])%(windowsize);
+	totarray[valindex] = totarray[valindex] + newval - valarray[valindex,w];
+	valarray[valindex,w] = newval;
+
+	ret = totarray[valindex] / windowsize;
+	indexarray[valindex]++;
+	return ret;
+}
+!/#/{
+for (i=1 ; i<=NF ; i++) 
+	st = st"\t"avg(i, $(i));
+print line++,st;
+st="";
+}

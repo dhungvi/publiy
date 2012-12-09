@@ -1,0 +1,3 @@
+echo "scp $s/distJar/System.jar reza@master.msrg.utoronto.ca:System/System.jar"
+chmod +rw $s/distJar/System.jar;
+scp $s/distJar/System.jar reza@master.msrg.utoronto.ca:System/System.jar

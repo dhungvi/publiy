@@ -1,0 +1,36 @@
+#!/bin/bash
+
+function check_for_delivery() {
+    while [ ! -z "$1" ]; do
+        local source_port="$1";
+        local source_seq="$2";
+
+        for deliv_file in $all_deliv_files; do
+            lines="`grep \"Seq\[$source_port:_$source_seq\]\" $deliv_file`";
+            if [ -z "$lines" ]; then
+                red -en "SEQ[$source_port:_$source_seq].";
+            else
+                green -en "SEQ[$source_port:_$source_seq].";
+            fi
+        done
+        echo "";
+        shift; shift;
+    done
+}
+
+if [ -d "$1" ]; then
+    all_files="`ls -d $1/*.gener`"
+else
+    all_files="$*";
+fi
+
+all_deliv_files=`ls *.deliv`;
+
+for file in $all_files; do
+    yellow "Checking $file";
+    green $all_deliv_files;
+    all_generated_sequences="`awk '/Seq/{seq=gensub(/.* Seq\[([[:digit:]]*):_([[:digit:]]*)\]/, \"\\\\1 \\\\2\", 1); printf seq\" \";}' $file`"
+
+    check_for_delivery $all_generated_sequences;
+done
+

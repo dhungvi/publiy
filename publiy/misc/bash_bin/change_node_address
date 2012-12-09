@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# awk "{print gensub(/NodeAddress=(.*)/, \"NodeAddress=$1\", 1);}" $2
+
+sed -i -e "s/NodeAddress=.*/NodeAddress=$1/" $2;

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+awk 'BEGIN{FS=""} {print ">"$0"<"; for(i=1;i<=NF;i++) {if($i=="/") printf "\\\\"; printf $i}}' $*;

@@ -1,0 +1,2 @@
+scp reza@master.msrg.utoronto.ca:padres-v1.0/build/10.0.*.confdt ./$1 
+scp reza@master.msrg.utoronto.ca:padres-v1.0/build/10.0.*.traffic ./$1 

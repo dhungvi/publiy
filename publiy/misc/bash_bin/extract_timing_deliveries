@@ -1,0 +1,128 @@
+#!/bin/bash
+
+if [ "$1" != "OK" ]; then
+    exit 0;
+else
+    shift; fi
+
+source common.sh
+
+if [ -z "$1" ]; then
+    red "Missing working dir ($0)";
+    exit -1; fi
+workingdir="$1";
+
+process1() {
+    local resultsdir="$1";
+    local tempdir="$2";
+    local plotsdir="$3";
+    blue "Process 1 on $resultsdir";
+    all_ports="";
+    all_machines="";
+    all_subs="";
+    all_pubs="";
+
+    # Process publishers
+    for pubprop in $resultsdir/p*.properties; do
+        node=`awk 'BEGIN{FS="="} /NodeName/{printf $NF}' $pubprop`;
+        machineip=`awk 'BEGIN{FS="\\\\\\\\|:|="} /NodeAddress/ {printf $2}' $pubprop`;
+        port=`awk 'BEGIN{FS="\\\\\\\\|:|="} /NodeAddress/ {printf $4}' $pubprop`;
+
+        portstr="$portstr port[$port]=\"$node\";";
+        nodestr="$nodestr node[\"$node\"]=\"$machineip\";";
+
+        all_machines="$machine $all_machines";
+        all_ports="$port $all_ports";
+        all_pubs="$node $all_pubs";
+    done
+
+    # Process subscribers
+    for subprop in $resultsdir/s*.properties; do
+        node=`awk 'BEGIN{FS="="} /NodeName/{printf $NF}' $subprop`;
+        machineip=`awk 'BEGIN{FS="\\\\\\\\|:|="} /NodeAddress/ {printf $2}' $subprop`;
+        port=`awk 'BEGIN{FS="\\\\\\\\|:|="} /NodeAddress/ {printf $4}' $subprop`;
+
+        portstr="$portstr port[$port]=\"$node\";";
+        nodestr="$nodestr node[\"$node\"]=\"$machineip\";";
+
+        all_machines="$machine $all_machines";
+        all_ports="$port $all_ports";
+        all_subs="$node $all_subs";
+    done
+
+    for sub in $all_subs; do
+        subresultsfile="$tempdir/BC-$sub*";
+        awk "/DELIV/{print gensub(/.*@([[:digit:]]*).*TMulticast_Publication_MP\[ [^ ]* [^ ]* [^ ]* (.*)\] ([[:digit:]]*) [^ ]* Seq.*/,\"\\\\1 \\\\2 \\\\3\",1)}" $subresultsfile | awk "BEGIN{$portstr $nodestr} {print \$1\"\t$sub\",node[\"$sub\"],\$2\"\t\"port[\$4],node[port[\$4]],\$3}";
+    done > $plotsdir/delivery_timings;
+}
+
+function process2() {
+    local resultsdir="$1";
+    local tempdir="$2";
+    local plotsdir="$3";
+    if [ ! -d "$plotsdir" ]; then
+        mkdir $plotsdir; fi
+    blue "Process 2 on $resultsdir";
+    
+    awk 'func abs(val){if(val<=0)return -val; else return val}
+         BEGIN{l=0;} {
+            i=$3","$6;
+            if(count[i]==0)
+                pair[++l]=i;
+            count[i]++;
+            timing[i]=timing[i]"\t"($1)" "($4-$7);
+    } END{
+            l=asorti(timing, sorted_indices);
+            for(j=1;j<=l;j++){
+                i=sorted_indices[j];
+                print i"\t"timing[i];
+            }
+    }' $plotsdir/delivery_timings > $plotsdir/delivery_timings_grouped;
+}
+
+function process3() {
+    local resultsdir="$1";
+    local tempdir="$2";
+    local plotsdir="$3";
+    if [ ! -d "$plotsdir" ]; then
+        mkdir $plotsdir; fi
+    blue "Process 3 on $resultsdir";
+    awk '{tot=0;for(i=2;i<=NF;i++)tot+=$i; print $1"\t"tot"\t"(NF-1)"\t"(NF<=1?-1:(tot/(NF-1)))}' $plotsdir/delivery_timings_grouped > $plotsdir/delivery_timings_summary;
+}
+
+function process4() {
+    local resultsdir="$1";
+    local tempdir="$2";
+    local plotsdir="$3";
+    blue "Process 4";
+    awk '{tot_time+=$2; tot_msg+=$3;}END{print tot_time" "tot_msg" "(tot_time/tot_msg)}' $plotsdir/delivery_timings_summary > $plotsdir/delivery_timings_final_summary;
+}
+
+
+if [ ! -d "$1" ]; then
+    red "Results dir is not accessible";
+    exit -1; fi
+resultsdir="$1";
+if [ -d "$2" ]; then
+    tempdir="$2";
+else
+    tempdir="$resultsdir/temp";
+    if [ ! -d "$tempdir" ]; then
+        red "No temp dir under results dir";
+        exit -1; fi
+fi
+plotsdir="$resultsdir/plots";
+if [ ! -d "$plotsdir" ]; then
+    mkdir -p $plotsdir; fi
+
+yellow "`basename $resultsdir`";
+    wait_on_stop;
+process1 $resultsdir $tempdir $plotsdir;
+    wait_on_stop;
+process2 $resultsdir $tempdir $plotsdir;
+    wait_on_stop;
+process3 $resultsdir $tempdir $plotsdir;
+    wait_on_stop;
+process4 $resultsdir $tempdir $plotsdir;
+green "DONE. `wc -l $plotsdir/delivery_timings | awk '{printf $1}'`";
+

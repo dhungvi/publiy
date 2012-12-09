@@ -1,0 +1,15 @@
+#!/bin/bash
+
+echo $sjar
+
+if [ $# = 1 ]; 
+then
+	arg=$(pwd)/$1
+else
+	arg=$(pwd)/deploy-127.0.0.1.sh 
+fi
+
+echo Running $arg
+
+$($arg)
+

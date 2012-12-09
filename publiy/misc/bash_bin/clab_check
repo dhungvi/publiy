@@ -1,0 +1,46 @@
+#! /bin/bash
+
+if [ -z "$1" ]; then echo "No anchor specified!"; exit -1;fi
+anchor="$1";
+if [ -z "$2" ]; then echo "No remote specified!"; exit -1;fi
+remote="$2";
+if [ -z "$3" ]; then echo "No valid sjarversion!"; exit -1; fi
+sjarversion="$3";
+
+SSH_TIMEOUT="20";
+
+# Local Variables
+localrepo="$lrepo";
+setup="$localrepo/setup";
+lib="$localrepo/lib";
+sshprivatekey="$HOME/.ssh/id_rsa";
+sshpubkey="$HOME/.ssh/id_rsa.pub";
+
+# Remote Variables
+CL_USER="reza";
+CL_HOME="/home/master/$CL_USER";
+CL_REPO="$CL_HOME/localrepo";
+CL_LIB="$CL_REPO/lib";
+CL_SETUP="$CL_REPO/setup";
+CL_SDIR="$CL_HOME/System";
+CL_SJAR="$CL_SDIR/System.jar";
+CL_BINDIR="$SDIR";
+CL_DATA="$CL_SDIR/data";
+
+# Check remote
+setupexists=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $CL_USER@$remote "if [ -d $CL_SETUP ]; then echo 'EXISTS'; else echo 'NONE'; mkdir -p $CL_REPO; fi"`;
+setupexists="EXISTS";
+setupexists="NONE";
+if [ "$setupexists" = "EXISTS" ]; then echo "USING existing setup."; else echo "UPLOADING setup"; scp -r -i $sshprivatekey $setup $CL_USER@$remote:$CL_REPO; ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $CL_USER@$remote "cp $CL_SETUP/.bash* $CL_HOME;"; fi;
+
+libexists=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $CL_USER@$remote 'if [ -d '$CL_LIB' ]; then echo "EXISTS"; else echo "NONE"; fi;'`;
+if [ "$libexists" = "NONE" ]; then echo "UPLOADING lib"; scp -r -i $sshprivatekey $lib $CL_USER@$remote:$CL_REPO; ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $CL_USER@$remote 'ARCH=`arch`; if [ `expr match "$ARCH" ".*_64*"` -ne 0 ]; then ln -s '$CL_LIB'/bindtest/linux64/bindtest.exe '$CL_LIB'/bindtest.exe; ln -s '$CL_LIB'/64bit/libJNI_CPU_C.so '$CL_LIB'/libJNI_CPU_C.so; else ln -s '$CL_LIB'/bindtest/linux32/bindtest.exe '$CL_LIB'/bindtest.exe; ln -s '$CL_LIB'/32bit/libJNI_CPU_C.so '$CL_LIB'/libJNI_CPU_C.so; fi; tar -zxf '$CL_LIB'/daemon.tar.gz -C '$CL_LIB' '; else echo "USING lib.";fi;
+
+exit 0;
+
+systemexists=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $CL_USER@$remote "if [ ! -d \"$CL_SDIR\" ]; then echo NONE; mkdir -p \`get_outputs_dir\`; ln -s $CL_LIB/System.jar $CL_SJAR; elif [ -f \"$CL_SJAR\" ]; then echo EXISTS {\`java sutils.SystemPackageVersion\`}; else echo NONE; fi;"`;
+if [ "$systemexists" = "NONE" -o "`expr match \"$systemexists\" \".*$sjarversion.*\"`" = "0" ]; then echo "UPLOADING sjar{$sjarversion}"; scp -i $sshprivatekey $CL_LIB/System.jar $CL_USER@$remote:$CL_LIB; else echo "USING existing system{$sjarversion}."; fi
+
+dataexists=`ssh -o ConnectTimeout=$SSH_TIMEOUT -o StrictHostKeyChecking=no -i $sshprivatekey $CL_USER@$remote "rm -rf $CL_DATA; echo NONE;"`;
+if [ `expr match "$dataexists" ".*NONE.*"` -gt 0 ]; then echo "UPLOADING data: scp -r -i $sshprivatekey $CL_DATA $CL_USER@$remote:$CL_SDIR;"; scp -r -i $sshprivatekey $CL_DATA $CL_USER@$remote:$CL_SDIR; else echo "USING data."; fi
+

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+     red "Lines rule is missing";
+     exit -1; fi
+linesrule="$1";
+
+shift;
+#awk "!/\#/{if(NR%$linesmodulo==0) print;}" $*;
+awk "!/\#/{if($linesrule) print;}" $*;

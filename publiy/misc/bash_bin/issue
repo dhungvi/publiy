@@ -1,0 +1,1 @@
+grep -a -i issue outputs/BC-*

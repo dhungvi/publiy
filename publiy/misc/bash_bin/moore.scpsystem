@@ -1,0 +1,3 @@
+echo $s/distJar/System.jar ; 
+scp $s/distJar/System.jar sherafr@moore.cas.mcmaster.ca:public_html/planetlab/System.jar 
+

@@ -1,0 +1,6 @@
+#!/bin/bash  
+
+awk "BEGIN{atLine=-1; line =0;print \"Looking for: '$1'\"} {line++} /$1/ {atLine=line; print \"\tAt Line:\",atLine;} END{print \"\tTotalLine:\",line}" $2 
+
+
+

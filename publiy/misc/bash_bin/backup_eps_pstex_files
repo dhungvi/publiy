@@ -1,0 +1,69 @@
+#!/bin/bash
+
+if [ -f "$1" ]; then
+    scan_files="$1";
+    workingdir="`dirname $1`";
+elif [ -d "$1" ]; then
+    workingdir="$1"
+    scan_files="`find $workingdir -name \"*.tex\"`";
+else
+    red "Working dir is missing."
+    exit -1; fi
+
+(
+cd $workingdir;
+
+I=0;
+while :; do
+  ((++I));
+  backupdir="$workingdir/backup__${I}"
+  if [ ! -d "$backupdir" ]; then
+     mkdir "$backupdir";
+     break; fi
+done
+
+green "$backupdir";
+
+for file in $scan_files; do
+    blue $file;
+    pstex_file="`awk '/input/ && /pstex_t/{printf gensub(/[^{]*{([^}]*)}.*/, \"\\\\1\", 1)\" \"}' $file`";
+    all_pstex_files="$pstex_file $all_pstex_files";
+    red "$pstex_file";
+    eps_file="`awk '/includegraphics/{printf gensub(/[^{]*{([^}]*)}.*/, \"\\\\1\", 1)\" \"}' $file`";
+    all_eps_files="$eps_file $all_eps_files";
+done
+
+pstex_prefix=".pstex_t"
+
+for pstex_file in $all_pstex_files; do
+
+    unix_pstex_file=`cygpath -u $pstex_file`;
+    if [ ! -f "$unix_pstex_file" ]; then
+        red "$unix_pstex_file";
+        continue; fi
+    green $unix_pstex_file;
+    cp $unix_pstex_file $backupdir;
+
+
+    fig_file=${pstex_file:0:`expr ${#pstex_file} \- ${#pstex_prefix}`}".fig";
+    unix_fig_file=`cygpath -u $fig_file`;
+    if [ ! -f "$unix_fig_file" ]; then
+        red "$unix_fig_file";
+        continue; fi
+    green $unix_fig_file;
+    cp $unix_fig_file $backupdir;
+
+done
+
+exit 0
+
+for eps_file in $all_eps_files; do
+    unix_eps_file=`cygpath -u $eps_file`;
+    if [ ! -f "$unix_eps_file" ]; then
+        red "$unix_eps_file";
+        continue; fi
+
+    green $unix_eps_file;
+    cp $unix_eps_file $backupdir;
+done
+)

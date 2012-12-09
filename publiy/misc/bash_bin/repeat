@@ -1,0 +1,30 @@
+#! /bin/bash
+while true ; do clear; $2 ; 
+#for i in `seq 1 $1`; do 
+	for z in `seq 1 $1`;
+	do
+	        for j in `seq 1 $z`; 
+		do
+			echo -n "*";
+		done
+
+ 	        for k in `seq $z $1`;
+		do
+			echo -n " ";
+		done;
+ 	    
+		echo -n "|";
+
+		sleep 1; 
+
+            	for k in `seq 1 $1`; 
+		do
+			echo -n -e "\b";
+		done
+
+	    	echo -n -e "\b\b" 
+	done;
+	if [ $1 -ge 10 ];  then 
+		echo -n -e "\a"
+	fi
+done

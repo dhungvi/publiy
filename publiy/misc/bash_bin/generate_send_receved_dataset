@@ -1,0 +1,2 @@
+#tmp_send_rcv_stat
+in_out_pub_stat  $1/ | awk 'BEGIN{print "NODEID NODEID ReceivedPubCount ReceivedPubBytes SentPubCount SentPubBytes "}{print (++l)" "gensub(/.*(BC-[[:alnum:]]*).*Received: ([[:digit:]]*).*Send: ([[:digit:]]*).*/, "\\1 \\2 \\3", 1);}END{print ""}';

@@ -1,0 +1,80 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	red "Working directory is missing!";
+	exit -1;
+fi
+workingdir="$1";
+
+port="11000";
+if [ ! -f "$workingdir/.labtype" ]; then 
+	red ".labtype is missing ($0)"; exit -1; fi
+labtype="`cat $workingdir/.labtype`";
+if [ "$labtype" = "CL" -o "$labtype" = "CL_NO_AFF" ]; then
+	sshprivatekey="/home/Reza/.ssh/id_rsa";
+	L_USER="reza";
+	L_HOME="/home/master/$L_USER";
+elif [ "$labtype" = "PL" ]; then
+	sshprivatekey="/home/Reza/.ssh/pl.id_rsa";
+	L_USER="$ft";
+	L_HOME="/home/$L_USER";
+else
+	red "Unknown labtype ($0)"; exit -1; fi
+
+if [ -f "$workingdir/nodes.used" ]; then
+    allnodesIPs="`awk '{printf $1" "}' $workingdir/nodes.used`"
+else
+    goodnodesfile="$workingdir/nodes.good";
+    if [ ! -f "$goodnodesfile" ]; then
+	red "Missing good.nodes file in working dir!";
+	exit -1;fi
+
+    nodes=`awk '!/\#/{printf $3" "}' $goodnodesfile`;
+    nodesArray=(`echo $nodes | tr ',' ' '`);
+
+    allnodesIPs="`ssh reza@master.msrg.utoronto.ca \"source ~/.bash_profile;host_lookup_all ${nodesArray[@]}\"`"; 
+fi
+
+for propfile in `ls $workingdir/backup/*.properties`; do
+	if [ `expr match "$nodesIPs" "[^ ]*"` -eq 0 ]; then
+		nodesIPs="$allnodesIPs"; fi
+
+	spaceIndex=`expr match "$nodesIPs" '[[:alnum:]\.:-]* '`;
+	if [ "$spaceIndex" -eq 0 ]; then red "INSUFFICIENT"; exit -1; fi;
+	beforespaceIndex="`expr $spaceIndex - 1`";
+	nodenodeip="${nodesIPs:0:$beforespaceIndex}"; 
+
+	colonIndex=`expr match "$nodenodeip" '.*:'`;
+	remote="${nodenodeip:$colonIndex}";
+	nodesIPs="${nodesIPs:$spaceIndex}";
+	blue -en "`basename $propfile` -> $remote: ";
+
+	# Find an available port number on remote
+	while [ "1" = "1" ]; do
+		port="`expr $port + 1`";
+		higherport="`expr $port + 1000`";
+		if [ "$labtype" = "PL" ]; then
+                        starttime=`date +%s`;
+			availability=`ssh -i $sshprivatekey $L_USER@$remote "source $L_HOME/.bash_profile; bindtest.exe $port $higherport"`; fi
+                        endtime=`date +%s`;
+                        delay=`expr $endtime \- $starttime`;
+		blue "$availability($delay)";
+		if [ `expr match "$availability" ".*TAKEN.*"` -eq 0 ]; then
+			break; fi
+	done
+
+	workingpropfile="$workingdir/`basename $propfile`";
+	cp $propfile $workingpropfile
+	change_node_address "$remote\\\\:$port" $workingpropfile;
+done
+
+yellow "RUNNING deploy-*.sh generator ...";
+generate_deploy_files $workingdir;
+
+change_in_out_bww $workingdir;
+#if [ -f "$workingdir/.inbw" -o -f "$workingdir/.outbw" ];
+#then
+#    inbw=`cat $workingdir/.inbw`;
+#    outbw=`cat $workingdir/.outbw`;
+#    change_in_out_bw $workingdir $inbw $outbw;
+#fi

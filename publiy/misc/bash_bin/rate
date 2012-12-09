@@ -1,0 +1,3 @@
+#!/bin/awk -f
+
+BEGIN{FS="\\[|\\]"}/TrafficLog/{print ++lineno,$2,$4"\t"$0}

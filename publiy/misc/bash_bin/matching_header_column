@@ -1,0 +1,1 @@
+awk "{for(i=1;i<=NF;i++)if(\$i==\"$1\")printf i\" \"; exit;}" $2;

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then red "Missing remote"; exit -1; else remote="$1"; fi;
+
+CL_USER="reza";
+sshprivatekey="/home/Reza/.ssh/id_rsa";
+
+blue "Killing remote $remote";
+ssh -i $sshprivatekey $CL_USER@$remote 'killall -9 java 2>/dev/null; killall -9 daemon-deployer.exe 2>/dev/null;';
+

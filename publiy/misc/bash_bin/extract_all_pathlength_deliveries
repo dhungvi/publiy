@@ -1,0 +1,14 @@
+#!/bin/bash
+
+source common.sh
+
+if [ ! -d "$1" ]; then
+    red "Working directory is not accessible ($0)";
+    exit -1; fi
+workingdir="$1";
+
+for resultsdir in `ls -d $workingdir/DT*/`; do
+    wait_on_stop;
+    extract_pathlength_deliveries $resultsdir;
+done
+

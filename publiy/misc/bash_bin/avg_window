@@ -1,0 +1,16 @@
+
+awk "
+	BEGIN{
+	  window=$1;
+	}
+	{
+	  w=(NR-1)%window + 1;
+	  for(i=1;i<=NF;i++) {
+		tot[i] = tot[i] + \$i - val[w,i];
+	  	val[w,i] = \$i;
+		avg=(NR<window?tot[i]/NR:tot[i]/window);
+		printf avg\" \";
+	  }
+	  print "\n";
+	}
+" $2;

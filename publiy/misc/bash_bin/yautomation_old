@@ -1,0 +1,71 @@
+#! /bin/bash
+
+y=$y;
+export guiAutomation=true;
+datasets="./data/zipf-MULT1.0-SKW1.0-PG24-PC10-SG24
+./data/zipf-MULT10.0-SKW1.0-PG24-PC10-SG24
+./data/zipf-MULT3.0-SKW1.0-PG24-PC10-SG24
+./data/zipf-MULT5.0-SKW1.0-PG24-PC10-SG24
+./data/zipf-MULT7.0-SKW1.0-PG24-PC10-SG24"
+
+startdate=`date`;
+echo "Starting @$startdate";
+
+for dataset in $datasets; do 
+for brokerDelta in 3; do
+for brokerStrategyNo in 1 2 3; do
+	while [ "`cat .stop`" = "STOP" ]; do if [ "$STOP" = "1" ]; then echo -en "."; sleep 10; else echo "SLEEPING @`date`"; STOP="1"; fi; done
+	if [ "$STOP" = "1" ] then echo "WAKING UP @`date`"; STOP="";fi;
+	echo ""; STOP="";
+	echo "UPDADING properties files: $dataset";
+	change_filename_dir $dataset/ ./backup_Feb2010/ ./ 2>"log-$startdate";
+	echo "`basename $dataset`" > useddataset;
+
+	brokerStrategy="STR$brokerStrategyNo";
+	echo "Running with D$brokerDelta, STR$brokerStrategyNo;"
+
+	echo "SCPALL: ";
+	cp d$brokerDelta/deploy* .;
+	scpall "./";
+	ssh -i ~/.ssh/id_rsa reza@master.msrg.utoronto.ca "source ~/.bash_profile; moveall;";
+
+	echo -en "AUTOMATE_PANDA: ";
+	runautomatedpanda&
+	autoPandaPID=$pid;
+
+	echo "WAITING for panda(pid=$autoPandaPID)";
+	wait $autoPandaPID;
+	echo "Done with panda(return=$?)";
+
+	for i in `seq 1 4`; do 
+		echo -en "."
+		sleep 5;
+	done
+	echo "";
+
+	echo -en "AUTOMATE_GUI: ";
+	./gui &
+	autoGuiPID=$pid;
+
+	echo "WAITING for gui(pid=$autoGuiPID)";
+	wait $autoGuiPID;
+	echo "Done with gui(return=$?)";
+
+
+	echo "WAITING for disks sync on master: ";
+	for i in `seq 1 10`; do 
+		echo -en "."
+		sleep 6;
+	done
+	echo "";
+
+	echo "MOVEY";
+	movey $y;
+
+	echo "";
+done;
+done;
+done;
+
+echo "Ending @`date`";
+	

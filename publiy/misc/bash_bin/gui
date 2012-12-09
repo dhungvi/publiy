@@ -1,0 +1,94 @@
+#!/bin/bash
+if [ -z "$1" ]; then
+	red "Working directory is missing ($0)";
+	exit -1;
+fi
+workingdir="$1";
+workingdir="`cygpath -w $workingdir/`";
+
+export SEPARATOR=';';
+if [ -z "$2" ]; then
+	auto="$guiAutomation";
+else
+	auto="$2";
+fi
+
+if [ ! -f "$workingdir/.labtype" ]; then
+	red "Missing .labtype file ($0)"; exit -1; fi
+labtype=`cat $workingdir/.labtype`;
+case "$labtype" in
+    "ML")
+       INITPORT=20000
+    ;;
+    "CL")
+       INITPORT=10000
+    ;;
+    "PL")
+       INITPORT=15000
+    ;;
+    "SL")
+       INITPORT=20000
+    ;;
+esac
+if [ ! -z "$commandCenterPort" ]; then INITPORT=$commandCenterPort; fi
+
+if [ -f "$workingdir/.gui" ]; then
+    source $workingdir/.gui; fi
+controllerAddress="`get_local_ip $workingdir`";
+strategy="$brokerStrategy";
+if [ -z "$strategy" ]; then strategy="STR1"; fi
+if [ ! -f "$workingdir/.tickscaler" ]; then
+	echo "1" > "$workingdir/.tickscaler"; fi
+tickscaler="`cat $workingdir/.tickscaler`";
+
+guioutputdir="$1/outputs";
+guioutput="$guioutputdir/GUI";
+if [ ! -d $guioutputdir ]; then
+	mkdir -p $guioutputdir; fi
+guioutput="/dev/null/"
+guioutput="$workingdir/outputs/NOGUI.$INITPORT"
+
+if [ -r "$workingdir/.brokercontrollerport" ]; then
+    broker_controller_port_str="-DBrokerController.PORT=`cat $workingdir/.brokercontrollerport`"; fi;
+
+if [ -z "$autoFTMEvents" ]; then autoFTMEvents=false; fi
+if [ "$autoFTMEvents" = "true" ]; then
+    if [ -z "$autoFTMInsertPause" ]; then red "autoFTMInsertPause not set"; exit -1; fi
+    if [ -z "$autoKillStartTick" ]; then red "autoKillStartTick not set"; exit -1; fi
+    if [ -z "$autoKillIntervalTick" ]; then red "autoKillIntervalTick not set"; exit -1; fi
+    if [ -z "$autoRecoverStartTick" ]; then red "autoRecoverStartTick not set"; exit -1; fi
+    if [ -z "$autoRecoverIntervalTick" ]; then red "autoRecoverIntervalTick not set"; exit -1; fi
+else
+    autoKillStartTick=-1;
+    autoKillIntervalTick=-1;
+    autoRecoverStartTick=-1;
+    autoRecoverIntervalTick=-1;
+fi
+
+workingdirwin=`cygpath -w $workingdir`;
+
+java \
+    -cp "$publiyjar$SEPARATOR$publiyguijar$SEPARATOR$layoutjar" \
+    $broker_controller_port_str \
+    -Dgui.main.MainFrame.brokerSupress="$brokerSupress" \
+    -Dgui.main.MainFrame.centerNode="$centerNode" \
+    -Dgui.tickIntervalScaler=$tickscaler \
+    -DBrokerControllerCenter.INITPORT=$INITPORT \
+    -DFTM.AUTO_FTM_EVENTS=$autoFTMEvents \
+    -DFTM.AUTO_FTM_INSERT_PAUSE=$autoFTMInsertPause \
+    -DFTM.AUTO_KILL_START_TICK=$autoKillStartTick \
+    -DFTM.AUTO_KILL_INTERVAL_TICK=$autoKillIntervalTick \
+    -DFTM.AUTO_RECOVER_START_TICK=$autoRecoverStartTick \
+    -DFTM.AUTO_RECOVER_INTERVAL_TICK=$autoRecoverIntervalTick \
+    -Dgui.main.MainFrame.autocontrolleraddress=$controllerAddress \
+    -Dgui.main.MainFrame.autostrategy=$strategy \
+    -Dgui.main.MainFrame.auto=$auto \
+    -Djava.library.path=$sdynamiclib \
+    -Djava.awt.headless=false \
+    -DFailureTimeline.compact=false \
+    -Dgui.main.MainFrame.workingDir=$workingdir \
+    org.msrg.publiy.gui.main.MainFrame > $guioutput 2>&1 &
+
+wait;
+
+

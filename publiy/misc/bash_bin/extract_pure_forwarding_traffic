@@ -1,0 +1,31 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Missing working dir";
+    exit -1; fi
+workingdir="$1";
+
+
+postfix=".stats";
+all_fnames="";
+i=0;
+
+if [ ! -f "$workingdir/all_fnames" ]; then
+    red "HERE"
+    for stats_file in `ls $workingdir/*$postfix`; do
+        fname="${stats_file:0:`expr ${#stats_file} \- ${#postfix}`}";
+        all_fnames="fnames["$((++i))"]=\"$fname\"; $all_fnames";
+
+        awk "BEGIN{prev_pub_deliv=0; fname=\"$fname.stats\"; while(1){if((getline < fname) <= 0) break; time[\$1]=(\$5 - prev_pub_deliv); prev_pub_deliv=\$5;}; fname=\"$fname.traffic\"; while(1){if((getline < fname) <= 0) break; time[\$3]=time[\$3]\" \"(\$8);}; l=asorti(time,dest); for(i=1;i<=l;i++){print dest[i]\"  \"time[dest[i]];} }" > "$fname.pure_forwarding_traffic"
+    done;
+    all_fnames="$all_fnames fnames_count=$i;";
+    echo "$all_fnames" > $workingdir/all_fnames;
+else
+    all_fnames="`cat $workingdir/all_fnames`";
+fi
+
+awk "BEGIN{$all_fnames cont=1; while(cont){ for(i=1;i<=fnames_count;i++) { fname=fnames[i]\".pure_forwarding_traffic\"; if((getline < fname) <= 0){cont=0;break;} if(i==1)printf \$1\" \"; printf \$2\" \"\$3\" \";} print \"\" }}" > $workingdir/pure_forwarding_traffic_summary
+
+awk "BEGIN{$all_fnames cont=1; while(cont){ for(i=1;i<=fnames_count;i++) { fname=fnames[i]\".pure_forwarding_traffic\"; if((getline < fname) <= 0){cont=0;break;} tot+=(\$3 - \$2);}}; print tot;}" > $workingdir/pure_forwarding_traffic_summary.total
+
+green "`cat $workingdir/pure_forwarding_traffic_summary.total`"

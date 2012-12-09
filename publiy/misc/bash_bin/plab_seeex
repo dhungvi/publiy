@@ -1,0 +1,35 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	echo "No remote specified!";
+	exit -1;
+else
+	remote=$1;
+fi
+
+if [ `expr match "$2" "SHOW"` -ne 0 ]; then
+	show=1;
+else
+	show=0;
+fi
+
+localrepo="$lrepo"
+PL_OUTPUT=/home/$ft/System/outputs;
+PL_USER="$ft";
+sshprivatekey="$localrepo/.ssh/pl.id_rsa";
+sshpubkey="$localrepo/.ssh/pl.id_rsa.pub";
+
+result=`ssh -i $sshprivatekey $PL_USER@$remote "source ~/.bash_profile; awk \"BEGIN{show=$show; ex=ioex=cex=0} /Exception/{ex++; if(show==1) print; } /IOException/{ioex++; if(show==1) print; } /ConnectException/{cex++; if(show==1)print; } END{print (ex-ioex-cex)\\\\\",\\\\\"(ioex)\\\\\",\\\\\"(cex)\\\\\",\\\\\"(show);}\" \\\`get_outputs_dir\\\`/* ";`
+
+echo "FROM $show $remote: $result";
+exit 0;
+
+result=`ssh -i ~/.ssh/pl.id_rsa $ft@$remote "grep Exception $PL_OUTPUT/*";`
+
+if [ `expr match "$result" "[^ ]*"` -ne 0 ]; then
+	if [ "$show" = "1" ]; then
+		echo "FROM $remote: $result";
+	else
+		echo "FROM $remote";
+	fi;
+fi

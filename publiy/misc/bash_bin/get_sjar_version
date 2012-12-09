@@ -1,0 +1,14 @@
+#!/bin/bash
+
+fixed_version="1.00-b1575"
+sjar_version=`java -cp "$sjar" sutils.SystemPackageVersion`;
+
+if [ "$1" = "FIXIT" ]; then
+    sed -i -e "s/^fixed_version=\".*\"\$/fixed_version=\"$sjar_version\"/" $0;
+    echo $sjar_version;
+elif [ ! -z "$fixed_version" -a "$1" != "REAL" ]; then
+    echo $fixed_version;
+else
+    echo $sjar_version;
+fi
+

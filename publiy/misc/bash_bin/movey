@@ -1,0 +1,79 @@
+#!/bin/bash
+
+source common.sh
+
+if [ -z "$1" ]; then
+	red "Working directory is missing!";
+	exit -1;
+elif [ -z "$2" ]; then
+	red "Need destination directory!";
+	exit -1;
+fi
+workingdir="$1";
+destdir="$2";
+
+if [ ! -d "$destdir" ]; then
+     red "Destination dir \"$destdir\" is not accessible.";
+     pink "Stoping at \"$workingdir\"";
+     stopthis $workingdir; fi
+
+wait_on_stop $workingdir;
+
+CL_USER="reza";
+CL_HOME="/home/master/$CL_USER";
+#CL_OUTPUTS="`get_outputs_dir`";
+sshprivatekey="/home/Reza/.ssh/pl.id_rsa";
+onedeployfile="`ls -d $workingdir/deploy-*.sh | head -1`";
+oneremoteip="`awk '/Deploy /{print $NF; exit 0;}' $onedeployfile | head -1`";
+while :; do
+    condense_description=`ssh -i $sshprivatekey $CL_USER@$oneremoteip "source $CL_HOME/.bash_profile; grep -a CONDENSE_DESCRIPTION \\\$OUTPUTS_DIR/BC-*" | head -1 | awk '{print $2}'`;
+    if [ -z "$condense_description" ]; then
+        red -en ">";
+        sleep 1;
+    else
+        break;
+    fi
+done
+
+dataset="`cat $workingdir/.useddataset`";
+pdelay="`cat $workingdir/.pdelay`";
+sdelay="`cat $workingdir/.sdelay`";
+suffix="0";
+finaldir="$destdir/DT{$dataset}-DELAY{$pdelay-$sdelay}-TICK`cat $workingdir/.tickscaler`-$condense_description";
+delim="__";
+while [ -d "$finaldir$delim$suffix" ]; do
+	suffix=`expr $suffix + 1`
+done
+finaldir="$finaldir$delim$suffix";
+
+
+# Printing out descriptions
+yellow "Using directory $finaldir";
+blue "Using condense_description $condense_description";
+
+# Doing the job!
+mkdir -p $finaldir 2>/dev/null;
+
+export lastmovey=$finaldir;
+
+clab_all $workingdir TARALL $finaldir;
+mv $workingdir/nodes.used $finaldir;
+mv $workingdir/*.properties $finaldir;
+mv $workingdir/deploy-*.sh $finaldir;
+mv $workingdir/.countall $finaldir;
+mv $workingdir/.checksubs $finaldir;
+mv $workingdir/.useddataset $finaldir;
+mv $workingdir/.strategy $finaldir;
+mv $workingdir/.usedsjarversion $finaldir;
+cp $workingdir/.tickscaler $finaldir;
+cp $workingdir/.labtype $finaldir;
+cp $workingdir/.inbw $finaldir;
+cp $workingdir/.outbw $finaldir;
+mv $workingdir/.execution_number $finaldir;
+mv $workingdir/.pdelay $finaldir;
+mv $workingdir/.sdelay $finaldir;
+
+exit 0;
+
+process $finaldir $destdir/.summaries;
+

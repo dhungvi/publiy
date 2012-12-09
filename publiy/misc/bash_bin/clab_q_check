@@ -1,0 +1,59 @@
+#! /bin/bash
+
+source common.sh
+
+if [ -z "$1" ]; then
+	red "No remote address specified!";
+	exit -1;
+else
+	remote="$1";
+fi;
+
+if [ -z "$2" ]; then
+	red "No data dir specified!";
+	exit -2; fi
+datadir="$2";
+
+# Local Variables
+#localrepo="/home/Reza/localrepo";
+#setup="$localrepo/setup/";
+#sshprivatekey="$localrepo/../.ssh/id_rsa";
+#sshpubkey="$localrepo/../.ssh/id_rsa.pub";
+
+# Remote Variables
+#CL_USER="reza";
+#CL_HOME="/home/master/$CL_USER";
+#CL_REPO="$CL_HOME/localrepo";
+#CL_LIB="$CL_REPO/lib";
+#CL_SETUP="$CL_REPO/setup";
+#CL_SDIR="$CL_HOME/System";
+#CL_SJAR="$CL_SDIR/System.jar";
+#CL_BINDIR="$SDIR";
+#CL_PATH=".:$CL_JAVADIR/bin";
+#CL_CLASSPATH="$CL_SJAR";
+#CL_DAEMON="$CL_LIB/daemon";
+#CL_DATA="$CL_SDIR/data";
+#CL_DATA_DESCRIPTOR="$CL_DATA/data_descriptor";
+
+# Now start
+local_sjar_version="`get_sjar_version`";
+remote_sjar_version=`ssh -i $sshprivatekey $CL_USER@$remote "source ~/.bash_profile; java -cp $CL_SJAR sutils.SystemPackageVersion"`;
+green "USED_SJAR_VERSION: $remote_sjar_version";
+
+if [ -z "$remote_sjar_version" -o `expr match "$remote_sjar_version" ".*$local_sjar_version.*"` -eq 0 ]; then
+	blue "UPLOADING system ($remote)";
+	scp -i $sshprivatekey `cygpath $sjar` $CL_USER@$remote:$CL_SDIR;
+        ssh -i $sshprivatekey $CL_USER@$remote "CL_SJAR_BACKUP=\`dirname $CL_SJAR\`/${local_sjar_version}_System.jar; cp $CL_SJAR \$CL_SJAR_BACKUP; echo \"BACKEDUP \\\$CL_SJAR_BACKUP\"";
+fi
+
+local_data_version="`cat $datadir/data_descriptor`";
+remote_data_version=`ssh -i $sshprivatekey $CL_USER@$remote "if [ -f \"$CL_DATA_DESCRIPTOR\" ]; then cat $CL_DATA_DESCRIPTOR; elif [ ! -d \"$CL_DATA\" ]; then mkdir $CL_DATA; fi"`;
+if [ -z "$remote_data_version" -o `expr match "$remote_data_version" ".*$local_data_version.*"` -eq 0 ]; then
+	blue "UPLOADING data ($remote)";
+	ssh -i $sshprivatekey $CL_USER@$remote "rm -rf $CL_DATA";
+	chmod +rwx $datadir;
+	chmod +rw $datadir/*;
+	scp -r -i $sshprivatekey $datadir $CL_USER@$remote:$CL_DATA/;
+fi
+
+

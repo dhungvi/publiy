@@ -1,0 +1,3 @@
+#!/bin/bash
+
+awk '/ERROR/{print $0;} /Exception/ {print $0;}' $* | grep -v "IOException" | grep -v "Socket" | grep -v "communication.core";

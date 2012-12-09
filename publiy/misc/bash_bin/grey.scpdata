@@ -1,0 +1,3 @@
+dtar=$s/data.tar.gz ; 
+scp $dtar reza@grey.msrg.utoronto.ca:public_html/planetlab/setup/data.tar.gz 
+

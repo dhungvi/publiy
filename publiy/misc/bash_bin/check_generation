@@ -1,0 +1,31 @@
+#!/bin/bash
+
+function check_for_generation() {
+    while [ ! -z "$1" ]; do
+        local source_port="$1";
+        local source_seq="$2";
+        local gener_file="*_${source_port}.gener";
+
+        lines="`grep \"Seq\[$source_port:_$source_seq\]\" $gener_file`";
+        if [ -z "$lines" ]; then
+            red -n "SEQ[$source_port:_$source_seq].";
+        else
+            green -n "SEQ[$source_port:_$source_seq].";
+        fi
+        shift; shift;
+    done
+}
+
+if [ -d "$1" ]; then
+    all_files="`ls -d $1/*.deliv`"
+else
+    all_files="$*";
+fi
+
+for file in $all_files; do
+    yellow "Checking $file";
+    all_delivered_sequences="`awk '/Seq/{seq=gensub(/.* Seq\[([[:digit:]]*):_([[:digit:]]*)\]/, \"\\\\1 \\\\2\", 1); printf seq\" \";}' $file`"
+    check_for_generation $all_delivered_sequences;
+    # green $all_delivered_sequences;
+done
+

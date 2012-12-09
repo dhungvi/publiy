@@ -1,0 +1,9 @@
+if [ -z "$1" ]; then
+	destDir=.;
+else
+	destDir=$1;
+fi
+
+echo "Destination dir: $destDir";
+
+scp reza@master.msrg.utoronto.ca:all.tar.gz $destDir

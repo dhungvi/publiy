@@ -1,0 +1,1 @@
+for f in `ls $1/BC-*`; do echo -en "\n$f"; for term in Received Send; do echo -ne "\t$term: "`grep -a "TMP $term" $f | wc -l`; done; done; echo "";

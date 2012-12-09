@@ -1,0 +1,18 @@
+package org.msrg.publiy.broker.controller.message;
+
+import java.io.Serializable;
+
+public enum QueryMessageTypes implements Serializable {
+	
+	QUERY_MESSAGE_OPSTATE,
+	QUERY_MESSAGE_COMPONENTSTATE,
+	
+	QUERY_MESSAGE_SUBSCRIPTIONS,
+	QUERY_MESSAGE_TOPOLOGY_LINKS,
+	QUERY_MESSAGE_ISESSIONS,
+	QUERY_MESSAGE_PSSESSIONS,
+	
+	QUERY_MESSAGE_STATISTICS,
+	QUERY_MESSAGE_EXCEPTIONS;
+	
+}

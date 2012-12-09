@@ -1,0 +1,41 @@
+#! /bin/bash
+
+if [ -z "$1" ]; then red "No destination specified!"; exit -1;fi
+remote="$1";
+if [ -z "$2" ];then scriptsdir=".";else scriptsdir="$2";fi
+
+blue "Executing on $remote...";
+
+# Local Variables
+CL_USER="reza";
+localrepo="/home/Reza/localrepo";
+setup="$localrepo/setup/";
+sshprivatekey="$localrepo/../.ssh/id_rsa";
+sshpubkey="$localrepo/../.ssh/id_rsa.pub";
+deployfile="$scriptsdir/deploy-$remote.sh";
+
+
+# Remote Variables
+CL_HOME="/home/master/$CL_USER";
+CL_REPO="$CL_HOME/localrepo";
+CL_LIB="$CL_REPO/lib";
+CL_SETUP="$CL_REPO/setup";
+CL_SDIR="$CL_HOME/System";
+CL_SJAR="$CL_SDIR/System.jar";
+CL_BINDIR="$SDIR";
+CL_DAEMON="$CL_LIB/daemon";
+CL_DEPLOYFILE="$CL_SDIR/deploy-$remote.sh";
+
+# Upload deploy file
+#change_output_dir "\\/home\\/master\\/$CL_USER\\/work\\/outputs\\/" $deployfile;
+change_output_dir "\`get_outputs_dir\`" $deployfile;
+
+
+# ssh -i $sshprivatekey $CL_USER@$remote "rm -rf $CL_SDIR/deploy-*";
+
+scp -i $sshprivatekey $deployfile $CL_USER@$remote:$CL_DEPLOYFILE >> $scriptsdir/.out.$remote 2>&1;
+
+ssh -i $sshprivatekey $CL_USER@$remote "killall daemon-deployer.exe; cd $CL_SDIR; $CL_DAEMON/daemon-deployer.exe $CL_DEPLOYFILE" >> $scriptsdir/.out.$remote 2>&1;
+
+yellow "EXEC No. `cat $scriptsdir/.execution_number`"
+

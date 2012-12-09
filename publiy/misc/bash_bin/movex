@@ -1,0 +1,46 @@
+#!/bin/bash
+
+if [ ! -d ./outputs/ ]; then
+	echo "./outputs/ directory is missing!";
+	exit -1;
+fi;
+
+if [ $# == 0 ]; then
+	echo "Need destination directory!";
+	exit -1;
+fi
+
+one_BC_output=`ls outputs/BC-* | head -1`;
+condense_description=`get_condense_description $one_BC_output`;
+
+suffix=0;
+dir=$1/$condense_description;
+delim="__";
+while [ -d $dir$delim$suffix ]; do
+	suffix=`expr $suffix + 1`
+done
+dir=$dir$delim$suffix;
+
+
+# Printing out descriptions
+echo "Using directory $dir";
+echo "Using condense_description $condense_description";
+
+
+# Doing the job!
+mkdir $dir;
+mv 127.0.0.1_* $dir;
+mv outputs/BC-* $dir;
+seeex $dir/BC-*;
+
+sumup_cols_across_files $dir/*.traffic>$dir/summedup_traffic;
+generate_send_receved_dataset $dir/ > $dir/send_received_dataset;
+avg $dir/send_received_dataset | awk '{print $3, $4}' > $dir/avg_send_received;
+
+echo -en "Publishings: "`count_publishings $dir/`"Deliveries: "`count_deliveries $dir/`;
+
+for window in 1 2 3 5 10; do
+	avgwindowfile=$dir/summedup_$window"avgwindow_traffic";	
+	avg_window $window $dir/summedup_traffic>$avgwindowfile;
+done
+

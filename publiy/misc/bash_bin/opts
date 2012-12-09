@@ -1,0 +1,29 @@
+#!/bin/bash
+
+
+while getopts httt:r:p:v OPTION
+do
+     case $OPTION in
+         h)
+             blue "$OPTION: $OPTARG";
+             exit 1
+             ;;
+         ttt)
+             blue "$OPTION: $OPTARG";
+             ;;
+         r)
+             blue "$OPTION: $OPTARG";
+             ;;
+         p)
+             blue "$OPTION: $OPTARG";
+             ;;
+         v)
+             blue "$OPTION: $OPTARG";
+             ;;
+         ?)
+             blue "$OPTION: $OPTARG";
+             exit
+             ;;
+     esac
+done
+

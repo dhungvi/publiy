@@ -1,0 +1,5 @@
+files=$1"deploy*"
+
+chmod +rw $files;
+
+scp $files reza@master.msrg.utoronto.ca:System/

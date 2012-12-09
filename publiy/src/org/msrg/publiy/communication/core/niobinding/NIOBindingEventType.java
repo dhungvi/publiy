@@ -1,0 +1,16 @@
+package org.msrg.publiy.communication.core.niobinding;
+
+public enum NIOBindingEventType {
+	
+	NIO_STATE_CHANGED,
+	NIO_MAKE_INCOMING,
+	NIO_MAKE_OUTGOING,
+	NIO_DESTROY,
+	NIO_KILL_ALL,
+	NIO_RENEW,
+	NIO_SEND,
+	NIO_SUMMARIZE_CHANNELS,
+	
+	NIO_REGISTER_UDP_CONINFO_NONLISTENING;
+
+}

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	echo "Wrong arguments, remote is missing";
+	exit -1; fi
+
+sshprivatekey="$HOME/.ssh/pl.id_rsa";
+remote="$1";
+PL_USER="$ft";
+
+starttime=`date +%s`;
+content=`ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i $sshprivatekey $PL_USER@$remote 'TERM=linux; echo -en "SUCCESS{\`w | grep \\"load average:\\"\` }";' 2>/dev/null`
+
+scp -i $sshprivatekey $PL_USER@$remote /tmp/JUNK $PL_USER@$remote:/tmp/;
+
+ret=$?;
+succ=`expr "$content" : ".*SUCCESS.*"`;
+if [ "$succ" = "" ]; then
+	err=1;
+elif [ "$succ" -ge 7 ]; then
+	err=0;
+else
+	err=1;
+fi;
+
+endtime=`date +%s`;
+duration=`expr $endtime - $starttime`;
+
+# echo "DURATION: $duration ($endtime,$starttime)";
+# echo "$remote `echo \"(0.1 * $err) + ($duration)\" | bc`";
+echo "`expr \( $err \* 1000000000000 \) + $duration` $remote $content";

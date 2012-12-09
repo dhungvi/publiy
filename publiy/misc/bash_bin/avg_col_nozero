@@ -1,0 +1,25 @@
+
+awk "
+	{
+	  if(NF>max_col_count)
+	    max_col_count = NF;
+	  for(i=1;i<=NF;i++) {
+		if (\$i != 0) {
+		  tot[i] += \$i;
+		  count[i]++;
+		}
+	  }
+	}
+	END{
+	  for(i=1;i<=max_col_count;i++) {
+		if (count[i]==0)
+		  printf \"INF \";
+		else {
+		  avg=tot[i]/count[i];
+		  printf avg;
+		  printf \" \";
+		}
+	  }
+	  print \"\";
+	}
+" $1;

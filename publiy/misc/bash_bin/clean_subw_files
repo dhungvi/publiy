@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+     red "No working dir specified ($0)";
+     exit -1; fi
+workingdir="$1";
+
+for file in `ls $workingdir/*.subw`; do
+    subsfile="`echo $file | awk '{printf gensub(/(.*)\.subw/,\"\\\\1\",1)}'`.subs";
+    green "$file -> $subsfile";
+
+    awk '/\#/{rst=1}!/\#/{if(rst==1){rst=0; l=0}; lines[++l]=$0;}END{for(i=1;i<=l;i++)print lines[i];}' $file > $subsfile;
+    done

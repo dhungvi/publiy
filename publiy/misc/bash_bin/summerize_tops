@@ -1,0 +1,1 @@
+awk '{if(printdate) print; printdate=false;}/=========/{print;printdate=1}/SMP/&&!/SOFTING/{print gensub(/.*=>([[:digit:]]*)\]([ ]*~~~>.*:([[:digit:]]*))?/, "\\1 \\2",1);}' $1

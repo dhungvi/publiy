@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Working dir $1 is not accessible";
+    exit -1; fi
+workingdir="$1";
+
+echo "#MULT, PDELAY, SDELAY, TICK, STR, PUBS, DELIVS, DUPS, EXECNO, COMMENT" > $workingdir/`basename $workingdir`_deliveries_table.csv;
+
+summariesfile="$workingdir/.summaries";
+if [ ! -r "$summariesfile" ]; then
+    yellow "RE-MAKING summaries first for $workingdir";
+    make_summaries2 $workingdir;
+fi
+
+    #print gensub(/.*MULT([[:digit:]\.]*).*DELAY{([[:digit:]]*)-([[:digit:]]*)}.*TICK([[:digit:]]*).*STR([[:digit:]]*).*__([[:digit:]]*).*Pub\(([[:digit:]]*).*Deliv\(([[:digit:]]*)\).*/,"\\1,\t\\2,\t\\3,\t\\4,\t\\5,\t\\7,\t\\8,\t--,\t\\6",1)",\t"$0}' $summariesfile >> $workingdir/`basename $workingdir`_deliveries_table.csv;
+
+awk '{
+    print gensub(/.*(DT.*MULT([[:digit:]\.]*).*DELAY{([[:digit:]]*)-([[:digit:]]*)}.*TICK([[:digit:]]*).*STR([[:digit:]]*).*__([[:digit:]]*).*) => Pub\(([[:digit:]]*).*Deliv\(([[:digit:]]*)\).*/,"\\2,\t\\3,\t\\4,\t\\5,\t\\6,\t\\8,\t\\9,\t--,\t\\7,\t\\1",1)",\t"}' $summariesfile >> $workingdir/`basename $workingdir`_deliveries_table.csv;

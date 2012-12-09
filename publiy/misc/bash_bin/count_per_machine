@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Invalid working dir $1";
+    exit -1; fi
+workingdir="$1";
+
+for prop in `ls $workingdir/*.properties`; do 
+    machine=`awk '/NodeAddress/{print gensub(/.*NodeAddress=([[:digit:]\.]*)\\\\:([[:digit:]]*)/, "\\\\1", 1)}' $prop;`
+    # echo "$machine"
+    machines="$machine $machines";
+done
+
+# echo "$machines"
+
+echo $machines | awk '{for(i=1;i<=NF;i++){machines[$i]++;}}END{l=asorti(machines,dest);for(i=1;i<=l;i++)print ""dest[i]" ==> "machines[dest[i]]"";}'

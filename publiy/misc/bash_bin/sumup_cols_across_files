@@ -1,0 +1,30 @@
+#!/bin/bash
+
+awk "
+	BEGIN {
+	  split(\"`echo $*`\",files,\" \");
+	  for (x in files)
+		filescount++;
+	  colcount=0;
+	  for (x in files) {
+	  	linecount=0;
+		while ((getline < files[x]) > 0) {
+			if (colcount==0)
+				colcount=NF;
+			else if (colcount != NF)
+				print \"ERROR! Col count changed: \"colcount\" vs. \"NF;
+
+			linecount++;
+			for (col=1;col<=colcount;col++)
+				cols[linecount,col] += \$col;
+		}
+	  }
+	  for (l=1;l<=linecount;l++) {
+		for (c=1;c<=colcount;c++)
+			printf cols[l,c]\" \";
+		print \"\";
+	  }
+	}
+" 
+ 
+

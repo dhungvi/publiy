@@ -1,0 +1,7 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then echo "Missing remote"; exit -1; else remote=$1; fi;
+
+blue "Killing remote $remote";
+ssh -i ~/.ssh/pl.id_rsa $ft@$remote 'killall -9 java 2>/dev/null; killall -9 daemon-deployer.exe 2>/dev/null;';
+

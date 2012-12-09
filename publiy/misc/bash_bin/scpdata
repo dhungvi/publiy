@@ -1,0 +1,11 @@
+#! /bin/bash
+
+if [ $# == 0 ]; then
+	dir="./data";
+else
+	dir=$1;
+fi
+
+echo $dir
+
+scp $dir/* reza@master.msrg.utoronto.ca:padres-v1.0/build/data/

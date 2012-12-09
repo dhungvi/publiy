@@ -1,0 +1,27 @@
+#!/bin/bash
+
+source common.sh
+
+if [ ! -d "$1" ]; then
+    red "Working directory is missing!";
+    exit -1; fi
+workingdir="`cygpath -a $1`";
+
+wait_on_stop;
+
+if [ ! -d "$2" ]; then
+    red "Temp directory is missing!";
+    exit -1; fi
+tempdir="$2";
+
+if [ -z "$3" ]; then
+    red "No summaries file specified";
+    exit -1; fi
+summaries_file="$3";
+
+pub_count=`count_publishings $tempdir`;
+del_count=`count_deliveries $tempdir`;
+yellow "@`date`: `basename $workingdir` => Pub($pub_count), Deliv($del_count)";
+echo "@`date`: `basename $workingdir` => Pub($pub_count), Deliv($del_count)" >> $summaries_file;
+
+green -e "DONE\n";

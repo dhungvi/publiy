@@ -1,0 +1,7 @@
+#! /bin/bash
+
+#echo "Looking for $1 in $2" 
+
+awk "BEGIN{mark=\"$1\"; gsub(/\\[/,\"\\\[\",mark); gsub(/\\]/,\"\\\]\",mark); markseen=0;} \$0 ~ mark {if ( markseen==0 ) {markseen=1;}} /###/ { if (markseen==1) {gsub(/\\[/,\"\\\[\",\$7); gsub(/\\]/,\"\\\]\",\$7); print \$7; exit 0}}" $2 
+
+

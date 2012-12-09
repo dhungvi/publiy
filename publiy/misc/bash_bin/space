@@ -1,0 +1,1 @@
+awk 'BEGIN{l=0} {printf l++"- "; print $0; print ""}'

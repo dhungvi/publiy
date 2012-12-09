@@ -1,0 +1,14 @@
+#!/bin/bash
+
+x=$x;
+export guiAutomation=true
+
+for str in 1 2 3; do 
+	brokerStrategy="STR$str";
+	echo "Running with $brokerStrategy";
+	rundeploy deploy-127.0.0.1.sh;
+	movex $x;
+	echo "";
+done
+
+export guiAutomation=false

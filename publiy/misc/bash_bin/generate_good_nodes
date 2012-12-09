@@ -1,0 +1,40 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then echo "Working dir not specified ($0)"; exit -1; fi
+workingdir="$1";
+
+if [ -z "$2" ]; then echo "No number of nodesspecified ($0)"; exit -1; fi
+requirednodescount="$2";
+requirednodescount="50";
+
+nodesfile="$workingdir/nodes";
+goodnodesfile="$workingdir/nodes.good";
+sortednodesfile="$workingdir/nodes.sorted";
+if [ ! -f $nodesfile -a ! -f $goodnodesfile ]; then
+	echo "Missing nodes file in working dir '$workingdir' ($0)"; exit -1; fi
+
+if [ "$2" = "RENEW" -o "$3" = "RENEW" ]; then
+	rm -f "$goodnodesfile" "sortednodesfile">/dev/null 2>&1; fi
+
+threshold="1";
+
+if [ -f "$goodnodesfile" ]; then
+	existinggoodnodescount=`wc -l $goodnodesfile | awk '{print $1}'`;
+	if [ $requirednodescount -gt $existinggoodnodescount ]; then
+		rm -f $goodnodesfile;
+	else
+		exit 0; fi;
+fi
+
+while [ 1 -eq 1 ]; do
+	get_good_nodes $workingdir `expr $threshold \* 7 + 10` `expr $threshold \* 1` `expr $threshold \* 1` `expr $threshold \* 1`;
+	nodescount="`wc -l $goodnodesfile | awk '{print $1}'`";
+	if [ "$requirednodescount" -le "$nodescount" ]; then
+		exit -1; fi
+	echo "Insufficient nodes ($nodescount) for properties ($requirednodescount): $threshold";
+	threshold=$((++threshold));
+done
+
+ips=`ssh reza@master.msrg.utoronto.ca "source ~/.bash_profile; host_lookup_all \`awk '{printf $3" "}' nodes.good\`"`;
+echo $ips | awk 'BEGIN{FS=":";RS=" "}{print $2}' > nodes.reuse
+

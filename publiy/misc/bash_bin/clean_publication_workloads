@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Invalid directory $1 ($0)";
+    exit -1; fi
+workingdir="$1";
+
+for dir in `ls -d $workingdir/DT*/`; do
+    yellow $dir;
+    for bcfile in `ls $dir/BC-s*`; do
+        blue $bcfile;
+        sed -i '/TTTMPublication_/d' $bcfile
+    done
+done

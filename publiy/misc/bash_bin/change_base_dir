@@ -1,0 +1,1 @@
+sed -i -e "s/basedir=.*/basedir=\"$1\"/" $2

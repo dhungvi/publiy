@@ -1,0 +1,51 @@
+#! /bin/bash
+
+on_die() {
+    yellow "Redirecting output";
+    blue "Say YES or yes to quit!";
+
+#    exec 1>&5
+    exec 5>&-
+    exec 6>&-
+
+    read c;
+    if [ "$c" = "YES" -o "$c" = "yes" ]; then
+        red "DYING :(";
+        kill -9 $spawned_pid 2>/dev/null;
+        exit 0;
+    fi
+    yellow "Redirecting back";
+}
+
+trap 'on_die' 2;
+
+
+exec 5>&1 
+exec 6>&5 
+
+echo "Hi5" >&5;
+echo "Hi6" >&6;
+
+echo "bye5" >&5;
+    exec 5>&-;
+echo "bye5" >&5;
+echo "bye6" >&6;
+    while :; do
+	sleep 1;
+	green "Hello world! $((++i))" >&6 
+    done&
+
+echo "Hi55" >&5;
+echo "Hi66" >&6;
+(
+
+spawned_pid=$!;
+echo "$spawned_pid";
+
+
+while read line; do
+    pink $line;
+    if [ "$line" = "exit" ]; then
+        on_die; fi
+done
+

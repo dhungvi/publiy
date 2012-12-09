@@ -1,0 +1,44 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    red "Missing working dir";
+    exit -1; fi
+workingdir="$1";
+
+i=0; 
+filesStr="";
+for file in `ls $workingdir/DT\{zipf-MULT1.0-SKW1.0-PG60-PC10-SG60\}-DELAY\{100-100\}-TICK2-d3-sSTR[123]-W1000-MP-FOUT10-CAND4-BW_METRIC_INOUT_BYTES\{100000000-100000000\}__0/plots/delivery_timings_grouped`; do
+#for file in `ls grouped[123]`; do
+    filesStr="files[$((++i))]=\"$file\";$filesStr";
+done
+filescountStr="filescount=$i;";
+
+awk 'BEGIN{
+  '$filesStr$filescountStr'
+  jold=j=filescount;
+  maxNF=0;
+  while(1==1) {
+    for(i=1;i<=filescount;i++) {
+      if ((getline < files[i]) > 0) {
+        if(NF>maxNF) maxNF=NF;
+        for (k=1;k<=NF;k++) {
+          lines[i,int(j/filescount),k]=$k;
+        }
+        j++;
+      }
+    }
+    if(jold==j)
+      break;
+    else
+      j=jold+filescount;
+    jold=j;
+  }
+  jold--;
+  for (k=1;k<=maxNF;k++) {
+    for (j=1;j<=filescount;j++)
+      for(i=1;i<=(jold/filescount);i++)
+        printf lines[j,i,k]", ";
+    print "";
+  }
+}'  > $workingdir/delivery_timings_grouped_vertical_`basename \`dirname \\\`dirname $file\\\`\``;
+

@@ -1,0 +1,4 @@
+ssh -v -i ~/.ssh/pl.id_rsa utoronto_jacobsen_ft@alice.cs.princeton.edu
+
+# planetlab2.csail.mit.edu
+# 128.42.142.43

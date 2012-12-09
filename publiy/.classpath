@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry excluding="broker/core/connectionManager/SessionRegisterManager.java|communication/core/sessions/ISessionConnectionTypeManager.java|pubsub/core/overlaymanager/multipath/WorkingOverlayNode.java|pubsub/core/overlaymanager/OverlayNodeType.java|utils/SubscriptionMatchingSummary.java|utils/SpecialHashSet.java|broker/core/connectionManager/connectionStateMachine/|utils/generator/subscriptions/SubscriptionFromLink.java|communication/core/packet/contineous/|utils/log/casuallogger/CpuCasualReader.java" kind="src" path="src"/>
+	<classpathentry excluding="test/Test2.java|test/TestProps.java" kind="src" path="srcController"/>
+	<classpathentry kind="src" path="srcMatcher"/>
+	<classpathentry excluding="communication/core/sessions/ISessionCandidate.java|pubsub/core/messagequeue/MessageQueueNodeMPStr2_unittest.java|pubsub/core/messagequeue/MessageQueueNodeMP_New.java|org/msrg/publiy/pubsub/core/messagequeue/MessageQueueNodeMP_New.java|org/msrg/publiy/pubsub/core/messagequeue/MessageQueueNodeMPStr2_unittest.java" kind="src" path="srcMP"/>
+	<classpathentry kind="src" path="srcNetCoding"/>
+	<classpathentry excluding="communication/core/sessions/ISessionBFT.java|org/msrg/publiy/communication/core/sessions/ISessionBFT.java" kind="src" path="srcBFT"/>
+	<classpathentry kind="src" path="srcTestCase"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.6.0_37"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/3"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/raccoon"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

@@ -1,0 +1,49 @@
+#! /bin/bash
+
+if [ -z "$1" ]; then red "No destination specified!"; exit -1;fi
+remote=$1;
+if [ -z "$2" ];then scriptsdir=".";else scriptsdir="$2";fi
+
+blue "Executing on $remote...";
+
+# Local Variables
+ft=utoronto_jacobsen_ft
+localrepo="/home/$ft/localrepo";
+javatar="$localrepo/java32.tar.gz";
+setup="$localrepo/setup/";
+sshprivatekey="$localrepo/.ssh/pl.id_rsa";
+sshpubkey="$localrepo/.ssh/pl.id_rsa.pub";
+deployfile=`ls $scriptsdir/deploy-$remote*.sh`;
+
+# Remote Variables
+PL_HOME=/home/$ft;
+PL_REPO=$PL_HOME/localrepo;
+PL_LIB=$PL_REPO/lib;
+PL_SETUP=$PL_REPO/setup;
+PL_JAVADIR=$PL_HOME/java;
+PL_JAVATAR=$PL_REPO/`basename $javatar`;
+PL_SDIR=$PL_HOME/System
+PL_SJAR=$PL_SDIR/System.jar;
+PL_BINDIR=$SDIR;
+PL_PATH=.:$PL_JAVADIR/bin;
+PL_CLASSPATH=$PL_SJAR;
+PL_OUTPUTS=$PL_SDIR/outputs;
+PL_DAEMON=$PL_LIB/daemon;
+PL_DEPLOYFILE=$PL_SDIR/`basename $deployfile`;
+
+# Upload deploy file
+change_output_dir "\\/home\\/$ft\\/System\\/outputs\\/" $deployfile;
+
+
+start_time=`date +%s`
+ssh -i $sshprivatekey $ft@$remote "rm -rf $PL_SDIR/deploy-*";
+
+scp -i $sshprivatekey $deployfile $ft@$remote:$PL_DEPLOYFILE >> $scriptsdir/.out.$remote 2>&1;
+
+ssh -i $sshprivatekey $ft@$remote "killall daemon-deployer.exe; cd $PL_SDIR; $PL_DAEMON/daemon-deployer.exe $PL_DEPLOYFILE" >> $scriptsdir/.out.$remote 2>&1;
+
+end_time=`date +%s`
+delay=`expr \( $end_time - $start_time \)`
+green "Executed on $remote($delay)...";
+
+

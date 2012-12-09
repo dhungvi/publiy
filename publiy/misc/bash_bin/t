@@ -1,0 +1,8 @@
+if [ -z $sj ]; then
+        echo "no sj"
+        sj=$(pwd)
+else
+        echo "yes"
+fi
+
+echo $sj > j
